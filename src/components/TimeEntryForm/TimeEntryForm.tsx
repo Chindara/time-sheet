@@ -1,18 +1,23 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { ActivityType, TimeEntry, CreateTimeEntryInput, UpdateTimeEntryInput } from '../../models/TimeEntry';
-import { parseHours, formatDateToISO } from '../../utils/validation';
+} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import {
+  ActivityType,
+  TimeEntry,
+  CreateTimeEntryInput,
+  UpdateTimeEntryInput,
+} from "../../models/TimeEntry";
+import { parseHours, formatDateToISO } from "../../utils/validation";
 
 interface TimeEntryFormProps {
   workItemId: number;
@@ -21,34 +26,41 @@ interface TimeEntryFormProps {
   onCancel: () => void;
 }
 
-export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry, onSave, onCancel }) => {
+export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({
+  workItemId,
+  entry,
+  onSave,
+  onCancel,
+}) => {
   const isEditMode = !!entry;
 
   const [date, setDate] = useState(entry?.date || formatDateToISO(new Date()));
-  const [hoursInput, setHoursInput] = useState(entry?.hours.toString() || '');
-  const [description, setDescription] = useState(entry?.description || '');
-  const [activityType, setActivityType] = useState<ActivityType>(entry?.activityType || ActivityType.Development);
-  const [error, setError] = useState<string>('');
+  const [hoursInput, setHoursInput] = useState(entry?.hours.toString() || "");
+  const [description, setDescription] = useState(entry?.description || "");
+  const [activityType, setActivityType] = useState<ActivityType>(
+    entry?.activityType || ActivityType.Development,
+  );
+  const [error, setError] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     // Parse hours
     const hours = parseHours(hoursInput);
     if (hours === null || hours <= 0) {
-      setError('Please enter a valid number of hours');
+      setError("Please enter a valid number of hours");
       return;
     }
 
     if (!date) {
-      setError('Please select a date');
+      setError("Please select a date");
       return;
     }
 
     if (!activityType) {
-      setError('Please select an activity type');
+      setError("Please select an activity type");
       return;
     }
 
@@ -61,7 +73,7 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
           date,
           hours,
           description: description.trim() || undefined,
-          activityType
+          activityType,
         };
         await onSave(input);
       } else {
@@ -70,24 +82,20 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
           date,
           hours,
           description: description.trim() || undefined,
-          activityType
+          activityType,
         };
         await onSave(input);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save time entry');
+      setError(
+        err instanceof Error ? err.message : "Failed to save time entry",
+      );
       setIsSaving(false);
     }
   };
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">
-          {isEditMode ? 'Edit Time Entry' : 'Log Time'}
-        </h3>
-      </div>
-
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -95,7 +103,10 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+      >
         <div className="space-y-2">
           <Label htmlFor="date">Date *</Label>
           <Input
@@ -119,7 +130,8 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
             disabled={isSaving}
           />
           <p className="text-xs text-muted-foreground">
-            Enter hours in decimal format (e.g., 1.5) or hours:minutes (e.g., 1:30)
+            Enter hours in decimal format (e.g., 1.5) or hours:minutes (e.g.,
+            1:30)
           </p>
         </div>
 
@@ -135,7 +147,10 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
             </SelectTrigger>
             <SelectContent>
               {Object.values(ActivityType).map((type) => (
-                <SelectItem key={type} value={type}>
+                <SelectItem
+                  key={type}
+                  value={type}
+                >
                   {type}
                 </SelectItem>
               ))}
@@ -164,7 +179,7 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({ workItemId, entry,
             type="submit"
             disabled={isSaving}
           >
-            {isEditMode ? 'Update' : 'Save'}
+            {isEditMode ? "Update" : "Save"}
           </Button>
           <Button
             type="button"

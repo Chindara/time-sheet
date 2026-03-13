@@ -1,12 +1,5 @@
 import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { ActivityType } from "../../models/TimeEntry";
 
 const ACTIVITY_COLORS: Record<string, string> = {
@@ -46,29 +39,56 @@ export const ActivityDonutChart: React.FC<ActivityDonutChartProps> = ({
   );
 
   return (
-    <ResponsiveContainer
-      width="100%"
-      height={220}
-    >
-      <PieChart>
-        <Pie
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={85}
-          dataKey="value"
-          nameKey="name"
-        >
+    <div className="space-y-3">
+      <ResponsiveContainer
+        width="100%"
+        height={180}
+      >
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            innerRadius={50}
+            outerRadius={75}
+            dataKey="value"
+            nameKey="name"
+          >
+            {chartData.map((entry) => (
+              <Cell
+                key={entry.name}
+                fill={ACTIVITY_COLORS[entry.name] ?? "#6b7280"}
+              />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value: number) => [`${value.toFixed(2)}h`]} />
+        </PieChart>
+      </ResponsiveContainer>
+
+      {/* Legend table */}
+      <div className="w-full text-xs">
+        <div className="divide-y">
           {chartData.map((entry) => (
-            <Cell
+            <div
               key={entry.name}
-              fill={ACTIVITY_COLORS[entry.name] ?? "#6b7280"}
-            />
+              className="grid grid-cols-[1fr_auto] gap-x-3 px-1 py-1 items-center"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: ACTIVITY_COLORS[entry.name] ?? "#6b7280",
+                  }}
+                />
+                <span className="truncate">{entry.name}</span>
+              </div>
+              <span className="text-right tabular-nums text-muted-foreground shrink-0">
+                {entry.value.toFixed(2)}h ({entry.percentage}%)
+              </span>
+            </div>
           ))}
-        </Pie>
-        <Tooltip formatter={(value: number) => [`${value.toFixed(2)}h`]} />
-      </PieChart>
-    </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
   );
 };

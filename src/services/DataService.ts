@@ -337,6 +337,17 @@ export class DataService {
   }
 
   /**
+   * Gets all time entries for the current user across all dates
+   */
+  async getAllUserTimeEntries(): Promise<TimeEntry[]> {
+    if (!this.currentUser) {
+      throw new Error('Data service not initialized');
+    }
+
+    return this.queryTimeEntries({ userId: this.currentUser.id });
+  }
+
+  /**
    * Calculates total hours for a set of time entries
    */
   calculateTotalHours(entries: TimeEntry[]): number {

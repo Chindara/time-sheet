@@ -1,96 +1,42 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Loader2,
-  Download,
-  AlertCircle,
-  Pencil,
-  Trash2,
-  ClipboardList,
-} from "lucide-react";
-import { TimeEntry, ActivityType } from "../../models/TimeEntry";
+import { Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { TimeEntry } from "../../models/TimeEntry";
 import { dataService } from "../../services/DataService";
-import { exportService } from "../../services/ExportService";
-import {
-  getDateRange,
-  formatDateForDisplay,
-  formatDateToISO,
-} from "../../utils/dateUtils";
+import { formatDateForDisplay } from "../../utils/dateUtils";
 import { ActivityDonutChart } from "./ActivityDonutChart";
-
-type DateRangePeriod =
-  | "this-week"
-  | "last-week"
-  | "this-month"
-  | "last-month"
-  | "this-quarter"
-  | "custom";
-
-const dateRangeOptions = [
-  { value: "this-week", label: "This Week" },
-  { value: "last-week", label: "Last Week" },
-  { value: "this-month", label: "This Month" },
-  { value: "last-month", label: "Last Month" },
-  { value: "this-quarter", label: "This Quarter" },
-  { value: "custom", label: "Custom Range" },
-] as const;
 
 interface TimesheetReportProps {
   onClose: () => void;
+  onEdit?: (entry: TimeEntry) => void;
+  onDelete?: (entry: TimeEntry) => void;
+  refreshKey?: number;
 }
 
 export const TimesheetReport: React.FC<TimesheetReportProps> = ({
   onClose,
+  onEdit,
+  onDelete,
+  refreshKey,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [period, setPeriod] = useState<DateRangePeriod>("this-week");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [filterActivity, setFilterActivity] = useState<ActivityType | "all">(
-    "all",
-  );
   const [deleteConfirmEntry, setDeleteConfirmEntry] =
     useState<TimeEntry | null>(null);
 
   useEffect(() => {
     loadEntries();
-  }, [period, startDate, endDate]);
+  }, [refreshKey]);
 
   const loadEntries = async () => {
     try {
       setIsLoading(true);
       setError("");
-
-      let start: string, end: string;
-
-      if (period === "custom") {
-        if (!startDate || !endDate) {
-          setIsLoading(false);
-          return;
-        }
-        start = startDate;
-        end = endDate;
-      } else {
-        const range = getDateRange(period);
-        start = formatDateToISO(range.startDate);
-        end = formatDateToISO(range.endDate);
-      }
-
-      const timeEntries = await dataService.getUserTimeEntries(start, end);
+      const timeEntries = await dataService.getAllUserTimeEntries();
       setEntries(timeEntries);
     } catch (err) {
       console.error("Failed to load timesheet:", err);
@@ -100,33 +46,9 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
     }
   };
 
-  const handlePeriodChange = (value: string) => {
-    setPeriod(value as DateRangePeriod);
-    if (value !== "custom") {
-      setStartDate("");
-      setEndDate("");
-    }
-  };
-
-  const handleExport = (format: "csv" | "excel") => {
-    const summary = exportService.generateSummary(entries, startDate, endDate);
-    const filename = `timesheet_${new Date().toISOString().split("T")[0]}.${format === "csv" ? "csv" : "xlsx"}`;
-
-    if (format === "csv") {
-      exportService.exportToCSV(entries, filename);
-    } else {
-      exportService.exportToExcel(entries, filename, summary);
-    }
-  };
-
-  // Filter entries by activity type
-  const filteredEntries =
-    filterActivity === "all"
-      ? entries
-      : entries.filter((e) => e.activityType === filterActivity);
-
   // Calculate totals
-  const totalHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0);
+  const filteredEntries = entries;
+  const totalHours = entries.reduce((sum, e) => sum + e.hours, 0);
 
   // Group by work item
   const byWorkItem = new Map<number, TimeEntry[]>();
@@ -145,104 +67,14 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
     activityHours.set(activity, dataService.calculateTotalHours(actEntries));
   });
 
-  const activityFilterOptions = [
-    { value: "all", label: "All Activities" },
-    ...Object.values(ActivityType).map((type) => ({
-      value: type,
-      label: type,
-    })),
-  ];
-
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">My Timesheet</h2>
-        <Button
-          variant="outline"
-          onClick={onClose}
-        >
-          <ClipboardList className="h-4 w-4 mr-2" />
-          Work Item Entries
-        </Button>
-      </div>
-
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-
-      {/* Filters row */}
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-1 min-w-[160px]">
-          <Select
-            value={period}
-            onValueChange={handlePeriodChange}
-          >
-            <SelectTrigger id="date-range">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {dateRangeOptions.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1 min-w-[160px]">
-          <Select
-            value={filterActivity}
-            onValueChange={(value) =>
-              setFilterActivity(value as ActivityType | "all")
-            }
-          >
-            <SelectTrigger id="activity-filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {activityFilterOptions.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {period === "custom" && (
-          <>
-            <div className="space-y-1">
-              <Label htmlFor="start-date">Start Date</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-[140px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="end-date">End Date</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-[140px]"
-              />
-            </div>
-          </>
-        )}
-      </div>
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-12">
@@ -254,7 +86,6 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left column (2/3): Time Entries */}
           <div className="md:col-span-2 space-y-3">
-            <h3 className="text-base font-semibold">Time Entries</h3>
             {byWorkItem.size === 0 ? (
               <div className="text-center py-12 text-muted-foreground text-sm">
                 No time entries found for the selected period
@@ -309,6 +140,7 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
                                 size="icon"
                                 className="h-6 w-6"
                                 title="Edit"
+                                onClick={() => onEdit?.(entry)}
                               >
                                 <Pencil className="h-3 w-3" />
                               </Button>
@@ -362,7 +194,7 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
                 </div>
 
                 {/* Activity breakdown */}
-                {activityHours.size > 0 && (
+                {/* {activityHours.size > 0 && (
                   <div className="space-y-2">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       By Activity
@@ -392,7 +224,7 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
                       },
                     )}
                   </div>
-                )}
+                )} */}
               </CardContent>
             </Card>
           </div>
@@ -429,7 +261,10 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => setDeleteConfirmEntry(null)}
+                  onClick={() => {
+                    onDelete?.(deleteConfirmEntry!);
+                    setDeleteConfirmEntry(null);
+                  }}
                 >
                   Delete
                 </Button>

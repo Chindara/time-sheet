@@ -1,28 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
-import * as SDK from 'azure-devops-extension-sdk';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Calendar, AlertCircle } from 'lucide-react';
-import { TimeEntry, CreateTimeEntryInput, UpdateTimeEntryInput } from './models/TimeEntry';
-import { dataService } from './services/DataService';
-import { workItemService } from './services/WorkItemService';
-import { TimeEntryForm } from './components/TimeEntryForm/TimeEntryForm';
-import { TimeEntryList } from './components/TimeEntryList/TimeEntryList';
-import { TimesheetReport } from './components/TimesheetReport/TimesheetReport';
-import './styles.css';
+import React, { useState, useEffect } from "react";
+import { createRoot } from "react-dom/client";
+import * as SDK from "azure-devops-extension-sdk";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Plus, Calendar, AlertCircle } from "lucide-react";
+import {
+  TimeEntry,
+  CreateTimeEntryInput,
+  UpdateTimeEntryInput,
+} from "./models/TimeEntry";
+import { dataService } from "./services/DataService";
+import { workItemService } from "./services/WorkItemService";
+import { TimeEntryList } from "./components/TimeEntryList/TimeEntryList";
+import { TimeEntryPanel } from "./components/TimeEntryPanel/TimeEntryPanel";
+import { TimesheetReport } from "./components/TimesheetReport/TimesheetReport";
+import "./styles.css";
 
 const TimeSheetTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [syncWarning, setSyncWarning] = useState(false);
   const [workItemId, setWorkItemId] = useState<number | null>(null);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
   const [showReport, setShowReport] = useState(true);
-  const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(
+    undefined,
+  );
   const [totalHours, setTotalHours] = useState(0);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   useEffect(() => {
     initialize();
@@ -31,7 +38,7 @@ const TimeSheetTab: React.FC = () => {
   const initialize = async () => {
     try {
       setIsLoading(true);
-      setError('');
+      setError("");
 
       // Initialize services (SDK already initialized before component mount)
       await dataService.initialize();
@@ -49,7 +56,7 @@ const TimeSheetTab: React.FC = () => {
       // Load time entries
       await loadTimeEntries(id);
     } catch (err) {
-      console.error('Initialization error:', err);
+      console.error("Initialization error:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Failed to initialize extension: ${errorMessage}`);
     } finally {
@@ -66,8 +73,8 @@ const TimeSheetTab: React.FC = () => {
       const total = dataService.calculateTotalHours(entries);
       setTotalHours(total);
     } catch (err) {
-      console.error('Failed to load entries:', err);
-      setError('Failed to load time entries');
+      console.error("Failed to load entries:", err);
+      setError("Failed to load time entries");
     }
   };
 
@@ -81,10 +88,12 @@ const TimeSheetTab: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleSaveEntry = async (input: CreateTimeEntryInput | UpdateTimeEntryInput) => {
+  const handleSaveEntry = async (
+    input: CreateTimeEntryInput | UpdateTimeEntryInput,
+  ) => {
     try {
       let syncOk: boolean;
-      if ('id' in input) {
+      if ("id" in input) {
         ({ syncOk } = await dataService.updateTimeEntry(input));
       } else {
         ({ syncOk } = await dataService.createTimeEntry(input));
@@ -99,9 +108,10 @@ const TimeSheetTab: React.FC = () => {
         await loadTimeEntries(workItemId);
       }
 
-      // Close form
+      // Close panel and refresh report
       setShowForm(false);
       setEditingEntry(undefined);
+      setReportRefreshKey((k) => k + 1);
     } catch (err) {
       throw err; // Let the form handle the error
     }
@@ -120,13 +130,14 @@ const TimeSheetTab: React.FC = () => {
         setSyncWarning(true);
       }
 
-      // Reload entries
+      // Reload entries and refresh report
       if (workItemId) {
         await loadTimeEntries(workItemId);
       }
+      setReportRefreshKey((k) => k + 1);
     } catch (err) {
-      console.error('Failed to delete entry:', err);
-      setError('Failed to delete time entry');
+      console.error("Failed to delete entry:", err);
+      setError("Failed to delete time entry");
     }
   };
 
@@ -147,9 +158,7 @@ const TimeSheetTab: React.FC = () => {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
         <div className="mt-4">
-          <Button onClick={initialize}>
-            Retry
-          </Button>
+          <Button onClick={initialize}>Retry</Button>
         </div>
       </div>
     );
@@ -161,7 +170,7 @@ const TimeSheetTab: React.FC = () => {
       <div className="border-b bg-card">
         <div className="flex items-center justify-between p-4">
           <div>
-            <h1 className="text-2xl font-bold">Time Sheet</h1>
+            <h2 className="text-2xl font-bold">Time Sheet</h2>
             <p className="text-sm text-muted-foreground">
               Total hours logged: {totalHours.toFixed(2)}
             </p>
@@ -169,18 +178,9 @@ const TimeSheetTab: React.FC = () => {
           <div className="flex gap-2">
             <Button
               onClick={handleLogTimeClick}
-              disabled={showForm || showReport}
+              disabled={showForm}
             >
-              <Plus className="h-4 w-4 mr-2" />
               Log Time
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowReport(true)}
-              disabled={showForm || showReport}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              My Timesheet
             </Button>
           </div>
         </div>
@@ -192,8 +192,17 @@ const TimeSheetTab: React.FC = () => {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>Time entry saved, but work item fields (Completed Work / Remaining Work) could not be updated.</span>
-              <Button variant="ghost" size="sm" onClick={() => setSyncWarning(false)}>Dismiss</Button>
+              <span>
+                Time entry saved, but work item fields (Completed Work /
+                Remaining Work) could not be updated.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSyncWarning(false)}
+              >
+                Dismiss
+              </Button>
             </AlertDescription>
           </Alert>
         </div>
@@ -201,23 +210,19 @@ const TimeSheetTab: React.FC = () => {
 
       {/* Content */}
       <div className="p-6">
-        {showReport ? (
-          <TimesheetReport onClose={() => setShowReport(false)} />
-        ) : showForm ? (
-          <TimeEntryForm
-            workItemId={workItemId!}
-            entry={editingEntry}
-            onSave={handleSaveEntry}
-            onCancel={handleCancelForm}
-          />
-        ) : (
-          <TimeEntryList
-            entries={entries}
-            currentUserId={currentUserId}
-            onEdit={handleEditEntry}
-            onDelete={handleDeleteEntry}
-          />
-        )}
+        <TimesheetReport
+          onClose={() => setShowReport(false)}
+          onEdit={handleEditEntry}
+          onDelete={handleDeleteEntry}
+          refreshKey={reportRefreshKey}
+        />
+        <TimeEntryPanel
+          isOpen={showForm}
+          workItemId={workItemId!}
+          entry={editingEntry}
+          onSave={handleSaveEntry}
+          onClose={handleCancelForm}
+        />
       </div>
     </div>
   );
@@ -229,16 +234,16 @@ SDK.init().then(async () => {
     // Wait for SDK to be fully ready
     await SDK.ready();
 
-    const container = document.getElementById('root');
+    const container = document.getElementById("root");
     if (container) {
       const root = createRoot(container);
       root.render(<TimeSheetTab />);
     } else {
-      console.error('Root container not found');
+      console.error("Root container not found");
     }
   } catch (err) {
-    console.error('Failed to initialize Azure DevOps SDK:', err);
-    const container = document.getElementById('root');
+    console.error("Failed to initialize Azure DevOps SDK:", err);
+    const container = document.getElementById("root");
     if (container) {
       container.innerHTML = `
         <div style="padding: 24px; color: #d13438;">
