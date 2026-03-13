@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(openspec list:*)",
+      "Bash(dir:*)",
+      "Bash(openspec validate:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx webpack:*)",
+      "Bash(npx webpack-cli:*)",
+      "Bash(npm run package:*)",
+      "Bash(openspec archive add-timesheet-extension:*)",
+      "Bash(openspec show:*)",
+      "Bash(openspec archive migrate-to-shadcn-ui:*)"
+    ]
+  }
+}

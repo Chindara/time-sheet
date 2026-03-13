@@ -1,0 +1,252 @@
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import * as SDK from 'azure-devops-extension-sdk';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Plus, Calendar, AlertCircle } from 'lucide-react';
+import { TimeEntry, CreateTimeEntryInput, UpdateTimeEntryInput } from './models/TimeEntry';
+import { dataService } from './services/DataService';
+import { workItemService } from './services/WorkItemService';
+import { TimeEntryForm } from './components/TimeEntryForm/TimeEntryForm';
+import { TimeEntryList } from './components/TimeEntryList/TimeEntryList';
+import { TimesheetReport } from './components/TimesheetReport/TimesheetReport';
+import './styles.css';
+
+const TimeSheetTab: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [syncWarning, setSyncWarning] = useState(false);
+  const [workItemId, setWorkItemId] = useState<number | null>(null);
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [showForm, setShowForm] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
+  const [totalHours, setTotalHours] = useState(0);
+
+  useEffect(() => {
+    initialize();
+  }, []);
+
+  const initialize = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+
+      // Initialize services (SDK already initialized before component mount)
+      await dataService.initialize();
+      await workItemService.initialize();
+      dataService.setWorkItemService(workItemService);
+
+      // Get current work item
+      const id = await workItemService.getCurrentWorkItemId();
+      setWorkItemId(id);
+
+      // Get current user
+      const user = SDK.getUser();
+      setCurrentUserId(user.id);
+
+      // Load time entries
+      await loadTimeEntries(id);
+    } catch (err) {
+      console.error('Initialization error:', err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to initialize extension: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadTimeEntries = async (workItemId: number) => {
+    try {
+      const entries = await dataService.getTimeEntriesForWorkItem(workItemId);
+      setEntries(entries);
+
+      // Calculate total hours
+      const total = dataService.calculateTotalHours(entries);
+      setTotalHours(total);
+    } catch (err) {
+      console.error('Failed to load entries:', err);
+      setError('Failed to load time entries');
+    }
+  };
+
+  const handleLogTimeClick = () => {
+    setEditingEntry(undefined);
+    setShowForm(true);
+  };
+
+  const handleEditEntry = (entry: TimeEntry) => {
+    setEditingEntry(entry);
+    setShowForm(true);
+  };
+
+  const handleSaveEntry = async (input: CreateTimeEntryInput | UpdateTimeEntryInput) => {
+    try {
+      let syncOk: boolean;
+      if ('id' in input) {
+        ({ syncOk } = await dataService.updateTimeEntry(input));
+      } else {
+        ({ syncOk } = await dataService.createTimeEntry(input));
+      }
+
+      if (!syncOk) {
+        setSyncWarning(true);
+      }
+
+      // Reload entries
+      if (workItemId) {
+        await loadTimeEntries(workItemId);
+      }
+
+      // Close form
+      setShowForm(false);
+      setEditingEntry(undefined);
+    } catch (err) {
+      throw err; // Let the form handle the error
+    }
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setEditingEntry(undefined);
+  };
+
+  const handleDeleteEntry = async (entry: TimeEntry) => {
+    try {
+      const { syncOk } = await dataService.deleteTimeEntry(entry.id);
+
+      if (!syncOk) {
+        setSyncWarning(true);
+      }
+
+      // Reload entries
+      if (workItemId) {
+        await loadTimeEntries(workItemId);
+      }
+    } catch (err) {
+      console.error('Failed to delete entry:', err);
+      setError('Failed to delete time entry');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">Loading time entries...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <div className="mt-4">
+          <Button onClick={initialize}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="flex items-center justify-between p-4">
+          <div>
+            <h1 className="text-2xl font-bold">Time Sheet</h1>
+            <p className="text-sm text-muted-foreground">
+              Total hours logged: {totalHours.toFixed(2)}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleLogTimeClick}
+              disabled={showForm || showReport}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Log Time
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowReport(true)}
+              disabled={showForm || showReport}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              My Timesheet
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync warning */}
+      {syncWarning && (
+        <div className="px-4 pt-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>Time entry saved, but work item fields (Completed Work / Remaining Work) could not be updated.</span>
+              <Button variant="ghost" size="sm" onClick={() => setSyncWarning(false)}>Dismiss</Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="p-6">
+        {showReport ? (
+          <TimesheetReport onClose={() => setShowReport(false)} />
+        ) : showForm ? (
+          <TimeEntryForm
+            workItemId={workItemId!}
+            entry={editingEntry}
+            onSave={handleSaveEntry}
+            onCancel={handleCancelForm}
+          />
+        ) : (
+          <TimeEntryList
+            entries={entries}
+            currentUserId={currentUserId}
+            onEdit={handleEditEntry}
+            onDelete={handleDeleteEntry}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Initialize SDK and render the component
+SDK.init().then(async () => {
+  try {
+    // Wait for SDK to be fully ready
+    await SDK.ready();
+
+    const container = document.getElementById('root');
+    if (container) {
+      const root = createRoot(container);
+      root.render(<TimeSheetTab />);
+    } else {
+      console.error('Root container not found');
+    }
+  } catch (err) {
+    console.error('Failed to initialize Azure DevOps SDK:', err);
+    const container = document.getElementById('root');
+    if (container) {
+      container.innerHTML = `
+        <div style="padding: 24px; color: #d13438;">
+          <h3>Failed to load Time Sheet extension</h3>
+          <p>Error: ${err instanceof Error ? err.message : String(err)}</p>
+          <p>Please refresh the page or contact your administrator.</p>
+        </div>
+      `;
+    }
+  }
+});

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Sheet Extension - Local Preview</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f3f2f1;
+        }
+        .preview-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 4px;
+            box-shadow: 0 1.6px 3.6px rgba(0,0,0,0.13), 0 0.3px 0.9px rgba(0,0,0,0.11);
+        }
+        .preview-header {
+            background-color: #0078d4;
+            color: white;
+            padding: 10px 20px;
+            margin: -20px -20px 20px;
+            border-radius: 4px 4px 0 0;
+        }
+        .preview-note {
+            background-color: #fff4ce;
+            border-left: 4px solid #ffb900;
+            padding: 12px;
+            margin-bottom: 20px;
+        }
+        #root {
+            min-height: 400px;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            font-size: 18px;
+            color: #605e5c;
+        }
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <div class="preview-header">
+            <h2>🧪 Local Preview - Time Sheet Extension</h2>
+        </div>
+        <div class="preview-note">
+            <strong>⚠️ Preview Mode:</strong> This is a local preview with mock data.
+            Azure DevOps SDK features are simulated. Deploy to Azure DevOps to test real functionality.
+        </div>
+        <div id="root">
+            <div class="loading">Loading preview...</div>
+        </div>
+    </div>
+
+    <!-- Load the bundled extension -->
+    <script src="dist/timesheet-tab.js"></script>
+
+    <script>
+        // Override console to show errors prominently
+        const originalError = console.error;
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            const root = document.getElementById('root');
+            if (root && root.querySelector('.loading')) {
+                root.innerHTML = `
+                    <div style="padding: 20px; color: #a4262c; background-color: #fde7e9; border-radius: 4px;">
+                        <h3>⚠️ Preview Error</h3>
+                        <p>Check the browser console (F12) for details.</p>
+                        <pre style="background: white; padding: 10px; overflow: auto;">${args.join('\n')}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        // Note: The extension will try to initialize Azure DevOps SDK
+        // Since we're running locally, it will likely fail
+        // To make this work properly, we'd need to mock the SDK
+        setTimeout(() => {
+            const root = document.getElementById('root');
+            if (root && root.querySelector('.loading')) {
+                root.innerHTML = `
+                    <div style="padding: 20px; color: #605e5c;">
+                        <h3>SDK Initialization Required</h3>
+                        <p>The extension requires Azure DevOps SDK which is not available in local preview mode.</p>
+                        <p><strong>To preview locally with full functionality:</strong></p>
+                        <ol>
+                            <li>Run: <code>npm run dev-preview</code> (we'll set this up next)</li>
+                            <li>This will load components with mock data</li>
+                        </ol>
+                        <p><strong>Or deploy to Azure DevOps:</strong></p>
+                        <ol>
+                            <li>Upload: <code>DMSSWE.devops-timesheet-extension-1.0.4.vsix</code></li>
+                            <li>Test in a real work item</li>
+                        </ol>
+                    </div>
+                `;
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
