@@ -1,100 +1,82 @@
 # Time Sheet for Azure DevOps
 
-Track time spent on work items with comprehensive reporting and export capabilities. This extension adds a dedicated "Time Sheet" tab to all work items, allowing teams to log hours, analyze time data, and export reports.
+Track time spent on work items with built-in reporting and work item synchronization. This extension adds a dedicated "Time Sheet" tab to all work items, allowing teams to log hours, view timesheet summaries, and keep Azure DevOps fields in sync automatically.
 
 ## Features
 
 ### 📝 Time Entry Logging
-- **Quick Time Logging**: Add time entries directly from work item forms
-- **Flexible Input**: Enter hours in decimal format (1.5) or time format (1:30)
-- **Rich Context**: Add descriptions and categorize work with 9 activity types:
+- **Quick Time Logging**: Add time entries directly from work item forms via a slide-in panel
+- **Flexible Input**: Enter hours in decimal format (e.g., `1.5`) or time format (e.g., `1:30`)
+- **Rich Context**: Add descriptions and categorize work with 8 activity types:
   - Development
   - Code Review
   - Testing
   - Bug Fixing
   - Documentation
-  - Planning/Meetings
-  - Research
+  - Design
+  - Requirements
   - Deployment
-  - Other
-- **Edit & Delete**: Manage your own time entries with full edit and delete capabilities
+- **Edit & Delete**: Manage your own time entries with full edit and delete capabilities (with delete confirmation)
 
-### 📊 Comprehensive Reporting
-- **My Timesheet View**: See all your time entries across work items
-- **Date Range Filtering**:
-  - This Week / Last Week
-  - This Month / Last Month
-  - This Quarter
-  - Custom date ranges
-- **Activity Analysis**: Visual breakdown of time by activity type with percentages
-- **Summary Statistics**: Total hours, entry counts, and work item summaries
-- **Work Item Grouping**: Time entries organized by work item for easy tracking
+### 📊 Timesheet Report
+- **My Entries View**: See all your time entries across all work items in one place
+- **Work Item Grouping**: Time entries organized by work item for easy tracking, with per-work-item hour totals
+- **Activity Breakdown**: Donut chart visualizing time distribution by activity type
+- **Summary Statistics**: Total hours logged and total entry count
+- **Inline Edit & Delete**: Edit or remove entries directly from the report
 
-### 📈 Data Export
-- **CSV Export**: Download time data in comma-separated format
-- **Excel-Compatible**: Export with summary statistics for spreadsheet analysis
-- **Multiple Export Levels**:
-  - Single work item exports
-  - User timesheet exports for date ranges
-  - Team and project-level exports
-- **Complete Data**: All time entry details, timestamps, and metadata included
+### 🔄 Automatic Work Item Synchronization
+- **Completed Work**: Automatically updates the `Completed Work` field to reflect the sum of all logged hours
+- **Remaining Work**: Automatically recalculates `Remaining Work` as `Original Estimate − Completed Work` (floored at 0)
+- **State Transitions** (Task and Bug work items only):
+  - When the **first** time entry is logged, the work item state is automatically set to **"In Development"**
+  - When the **last** time entry is deleted (no entries remain), the work item state is automatically reset to **"New"**
+- All synchronization is non-blocking: if a field or state update fails, the time entry operation still succeeds and a dismissible warning is shown
 
 ### 🔒 Security & Permissions
 - **Work Item Permissions**: Respects Azure DevOps work item security
-- **User Isolation**: Users can only edit/delete their own time entries
-- **Secure Storage**: Data stored using Azure DevOps Extension Data Service
+- **User Isolation**: Users can only edit or delete their own time entries
+- **Secure Storage**: Data stored using Azure DevOps Extension Data Service with retry logic
 
 ## Getting Started
 
 ### Installation
 1. Install the extension from the Azure DevOps Marketplace
 2. Navigate to any work item in your Azure DevOps organization
-3. Click the "Time Sheet" tab to start logging time
+3. Click the **"Time Sheet"** tab to start logging time
 
 ### Logging Time
 1. Open any work item (User Story, Task, Bug, etc.)
-2. Click the "Time Sheet" tab
-3. Click "Log Time" button
+2. Click the **"Time Sheet"** tab
+3. Click **"Log Time"**
 4. Fill in:
    - Date (defaults to today)
-   - Hours (e.g., 1.5 or 1:30)
+   - Hours (e.g., `1.5` or `1:30`)
    - Activity Type
-   - Description (optional)
-5. Click "Save"
+   - Description (optional, up to 500 characters)
+5. Click **"Save"**
+
+The work item's Completed Work and Remaining Work fields update automatically. For Task and Bug work items, the state transitions to "In Development" on the first entry.
 
 ### Viewing Your Timesheet
-1. From any work item's Time Sheet tab, click "My Timesheet"
-2. Select your date range (defaults to This Week)
-3. Filter by activity type if desired
-4. View summary statistics and detailed entries
-5. Export to CSV or Excel for external analysis
+The Time Sheet tab displays all your time entries across work items grouped by work item, alongside a donut chart and summary totals. Use the edit (pencil) and delete (trash) icons next to each entry to manage them inline.
 
-### Exporting Data
-- **From Work Item**: View time entries on a work item and export that specific data
-- **From Timesheet**: Click "Export CSV" or "Export Excel" to download your timesheet
-- **Reports Include**: All time entries with user names, dates, hours, activities, and descriptions
+### Warnings
+If the automatic work item field sync or state transition cannot complete (e.g., due to insufficient permissions or a network error), a dismissible warning banner is shown at the top of the tab. The time entry itself is always saved successfully.
 
 ## Use Cases
 
-### Project Management
-- Track actual time spent vs. estimates
-- Understand team capacity and utilization
-- Identify bottlenecks in development process
-
-### Billing & Invoicing
-- Export time data for client billing
-- Generate detailed timesheets for invoicing
-- Track billable vs. non-billable hours by activity type
+### Sprint & Project Tracking
+- Track actual time spent vs. estimates using automatic Completed/Remaining Work sync
+- Identify which activity types consume the most time
 
 ### Productivity Analysis
-- Analyze time distribution across activity types
-- Identify time-consuming activities
-- Optimize team workflows based on time data
+- Analyze time distribution across activity types via the built-in donut chart
+- Review time logged across multiple work items from a single view
 
-### Compliance & Reporting
-- Maintain accurate time records
-- Generate reports for stakeholders
-- Export data for integration with other systems
+### Compliance & Auditing
+- Maintain accurate, per-user time records stored securely within Azure DevOps
+- All entries include timestamps (created/updated) for audit trails
 
 ## Privacy & Data
 
@@ -105,19 +87,20 @@ Track time spent on work items with comprehensive reporting and export capabilit
 
 ## Support
 
-- **Documentation**: [GitHub Repository](https://github.com/your-username/devops-time-sheet)
-- **Issues**: [Report Issues](https://github.com/your-username/devops-time-sheet/issues)
-- **Feature Requests**: Submit feature requests via GitHub Issues
+- **Repository**: [github.com/Chindara/time-sheet](https://github.com/Chindara/time-sheet)
+- **Issues & Feature Requests**: [GitHub Issues](https://github.com/Chindara/time-sheet/issues)
 
 ## Version History
 
+### 1.0.1
+- Automatic state transitions for Task and Bug work items (first entry → "In Development", last entry deleted → "New")
+
 ### 1.0.0 (Initial Release)
 - Time entry logging on work items
-- My Timesheet reporting view
-- CSV and Excel export functionality
-- Activity type categorization
-- Date range filtering
-- Summary statistics
+- Timesheet report grouped by work item with activity donut chart
+- Automatic Completed Work and Remaining Work field sync
+- Edit and delete with ownership enforcement
+- 8 activity type categories
 
 ## License
 
@@ -125,4 +108,4 @@ MIT License - See LICENSE.txt for details
 
 ---
 
-**Built with ❤️ for Azure DevOps teams who need simple, effective time tracking**
+**Built for Azure DevOps teams who need simple, effective time tracking**

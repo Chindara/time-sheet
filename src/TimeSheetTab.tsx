@@ -20,6 +20,7 @@ const TimeSheetTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [syncWarning, setSyncWarning] = useState(false);
+  const [stateTransitionWarning, setStateTransitionWarning] = useState(false);
   const [workItemId, setWorkItemId] = useState<number | null>(null);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -93,14 +94,18 @@ const TimeSheetTab: React.FC = () => {
   ) => {
     try {
       let syncOk: boolean;
+      let stateTransitionOk = true;
       if ("id" in input) {
         ({ syncOk } = await dataService.updateTimeEntry(input));
       } else {
-        ({ syncOk } = await dataService.createTimeEntry(input));
+        ({ syncOk, stateTransitionOk } = await dataService.createTimeEntry(input));
       }
 
       if (!syncOk) {
         setSyncWarning(true);
+      }
+      if (!stateTransitionOk) {
+        setStateTransitionWarning(true);
       }
 
       // Reload entries
@@ -124,10 +129,13 @@ const TimeSheetTab: React.FC = () => {
 
   const handleDeleteEntry = async (entry: TimeEntry) => {
     try {
-      const { syncOk } = await dataService.deleteTimeEntry(entry.id);
+      const { syncOk, stateTransitionOk } = await dataService.deleteTimeEntry(entry.id);
 
       if (!syncOk) {
         setSyncWarning(true);
+      }
+      if (!stateTransitionOk) {
+        setStateTransitionWarning(true);
       }
 
       // Reload entries and refresh report
@@ -200,6 +208,27 @@ const TimeSheetTab: React.FC = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSyncWarning(false)}
+              >
+                Dismiss
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* State transition warning */}
+      {stateTransitionWarning && (
+        <div className="px-4 pt-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Time entry saved, but the work item status could not be updated automatically.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStateTransitionWarning(false)}
               >
                 Dismiss
               </Button>

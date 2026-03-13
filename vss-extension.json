@@ -1,10 +1,10 @@
 {
   "manifestVersion": 1,
   "id": "devops-timesheet-extension",
-  "version": "1.0.13",
-  "name": "Time Sheet for Azure DevOps",
+  "version": "1.0.1",
+  "name": "Time Sheet",
   "description": "Track time spent on work items with comprehensive reporting and export capabilities. Log hours, generate timesheet reports, and export data to CSV/Excel.",
-  "publisher": "DMSSWE",
+  "publisher": "iamcpb",
   "categories": ["Azure Boards"],
   "tags": [
     "time tracking",
@@ -33,18 +33,18 @@
   },
   "links": {
     "getstarted": {
-      "uri": "https://github.com/your-username/devops-time-sheet#getting-started"
+      "uri": "https://github.com/Chindara/time-sheet#getting-started"
     },
     "support": {
-      "uri": "https://github.com/your-username/devops-time-sheet/issues"
+      "uri": "https://github.com/Chindara/time-sheet/issues"
     },
     "repository": {
-      "uri": "https://github.com/your-username/devops-time-sheet"
+      "uri": "https://github.com/Chindara/time-sheet"
     }
   },
   "repository": {
     "type": "git",
-    "uri": "https://github.com/your-username/devops-time-sheet"
+    "uri": "https://github.com/Chindara/time-sheet"
   },
   "contributions": [
     {

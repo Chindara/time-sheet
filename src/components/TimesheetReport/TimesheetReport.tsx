@@ -112,7 +112,10 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
 
                       {/* Compact entry rows */}
                       <div className="divide-y">
-                        {workItemEntries.map((entry) => (
+                        {workItemEntries
+                          .slice()
+                          .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+                          .map((entry) => (
                           <div
                             key={entry.id}
                             className="px-3 py-2 flex items-center gap-3 text-sm hover:bg-muted/20"

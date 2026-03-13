@@ -91,6 +91,13 @@ export class WorkItemService {
   }
 
   /**
+   * Sets the state of the current work item
+   */
+  async setWorkItemState(state: string): Promise<void> {
+    await this.setFieldValues({ 'System.State': state });
+  }
+
+  /**
    * Sets field values on the current work item
    */
   async setFieldValues(fields: { [key: string]: any }): Promise<void> {

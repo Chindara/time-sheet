@@ -77,9 +77,9 @@ export class DataService {
 
   /**
    * Creates a new time entry
-   * @returns the saved entry and a syncOk flag (false means field write-back failed)
+   * @returns the saved entry, a syncOk flag, and a stateTransitionOk flag
    */
-  async createTimeEntry(input: CreateTimeEntryInput): Promise<{ entry: TimeEntry; syncOk: boolean }> {
+  async createTimeEntry(input: CreateTimeEntryInput): Promise<{ entry: TimeEntry; syncOk: boolean; stateTransitionOk: boolean }> {
     // Validate input
     const validation = validateCreateTimeEntry(input);
     if (!validation.isValid) {
@@ -89,6 +89,10 @@ export class DataService {
     if (!this.dataManager || !this.currentUser) {
       throw new Error('Data service not initialized');
     }
+
+    // Check whether this will be the first entry before saving
+    const existingEntries = await this.getTimeEntriesForWorkItem(input.workItemId);
+    const isFirstEntry = existingEntries.length === 0;
 
     const now = new Date();
     const entry: TimeEntry = {
@@ -125,7 +129,10 @@ export class DataService {
       });
 
       const syncOk = await this.syncWorkItemTimeFields(entry.workItemId);
-      return { entry, syncOk };
+      const stateTransitionOk = isFirstEntry
+        ? await this.tryTransitionWorkItemState(entry.workItemId, 'In Development')
+        : true;
+      return { entry, syncOk, stateTransitionOk };
     } catch (error) {
       console.error('Failed to create time entry:', error);
       throw new Error('Failed to save time entry. Please try again.');
@@ -198,9 +205,9 @@ export class DataService {
 
   /**
    * Deletes a time entry
-   * @returns a syncOk flag (false means field write-back failed)
+   * @returns a syncOk flag and a stateTransitionOk flag
    */
-  async deleteTimeEntry(id: string): Promise<{ syncOk: boolean }> {
+  async deleteTimeEntry(id: string): Promise<{ syncOk: boolean; stateTransitionOk: boolean }> {
     if (!this.dataManager || !this.currentUser) {
       throw new Error('Data service not initialized');
     }
@@ -221,7 +228,14 @@ export class DataService {
       });
 
       const syncOk = await this.syncWorkItemTimeFields(workItemId);
-      return { syncOk };
+
+      // Check whether all entries are now gone
+      const remainingEntries = await this.getTimeEntriesForWorkItem(workItemId);
+      const stateTransitionOk = remainingEntries.length === 0
+        ? await this.tryTransitionWorkItemState(workItemId, 'New')
+        : true;
+
+      return { syncOk, stateTransitionOk };
     } catch (error) {
       console.error('Failed to delete time entry:', error);
       if (error instanceof Error && error.message.includes('only delete your own')) {
@@ -413,6 +427,28 @@ export class DataService {
       return true;
     } catch (error) {
       console.warn('Failed to sync work item time fields:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Attempts to transition the work item state. Only acts on Task and Bug work item types.
+   * Errors are non-fatal — logs a warning and returns false on failure.
+   */
+  private async tryTransitionWorkItemState(workItemId: number, state: string): Promise<boolean> {
+    if (!this.workItemService) {
+      return false;
+    }
+
+    try {
+      const type = await this.workItemService.getWorkItemType();
+      if (type !== 'Task' && type !== 'Bug') {
+        return true;
+      }
+      await this.workItemService.setWorkItemState(state);
+      return true;
+    } catch (error) {
+      console.warn(`Failed to transition work item ${workItemId} state to "${state}":`, error);
       return false;
     }
   }
