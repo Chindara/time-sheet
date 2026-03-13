@@ -177,7 +177,6 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
       {/* Filters row */}
       <div className="flex flex-wrap gap-4">
         <div className="space-y-1 min-w-[160px]">
-          <Label htmlFor="date-range">Date Range</Label>
           <Select
             value={period}
             onValueChange={handlePeriodChange}
@@ -198,7 +197,6 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
           </Select>
         </div>
         <div className="space-y-1 min-w-[160px]">
-          <Label htmlFor="activity-filter">Filter by Activity</Label>
           <Select
             value={filterActivity}
             onValueChange={(value) =>
