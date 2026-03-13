@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Clock, Edit, Trash2 } from 'lucide-react';
-import { TimeEntry, ActivityType } from '../../models/TimeEntry';
-import { formatDateForDisplay, formatDateTimeForDisplay } from '../../utils/dateUtils';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock, Edit, Trash2 } from "lucide-react";
+import { TimeEntry, ActivityType } from "../../models/TimeEntry";
+import {
+  formatDateForDisplay,
+  formatDateTimeForDisplay,
+} from "../../utils/dateUtils";
 
 interface TimeEntryListProps {
   entries: TimeEntry[];
@@ -13,8 +16,15 @@ interface TimeEntryListProps {
   onDelete: (entry: TimeEntry) => Promise<void>;
 }
 
-export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUserId, onEdit, onDelete }) => {
-  const [deleteDialogEntry, setDeleteDialogEntry] = useState<TimeEntry | null>(null);
+export const TimeEntryList: React.FC<TimeEntryListProps> = ({
+  entries,
+  currentUserId,
+  onEdit,
+  onDelete,
+}) => {
+  const [deleteDialogEntry, setDeleteDialogEntry] = useState<TimeEntry | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDeleteClick = (entry: TimeEntry) => {
@@ -29,7 +39,7 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUs
       await onDelete(deleteDialogEntry);
       setDeleteDialogEntry(null);
     } catch (error) {
-      console.error('Failed to delete entry:', error);
+      console.error("Failed to delete entry:", error);
     } finally {
       setIsDeleting(false);
     }
@@ -39,21 +49,22 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUs
     setDeleteDialogEntry(null);
   };
 
-  const getActivityBadgeVariant = (activityType: ActivityType): "default" | "secondary" | "destructive" | "outline" => {
+  const getActivityBadgeVariant = (
+    activityType: ActivityType,
+  ): "default" | "secondary" | "destructive" | "outline" => {
     switch (activityType) {
-      case ActivityType.Development:
-        return "default";
-      case ActivityType.Testing:
-        return "secondary";
-      case ActivityType.BugFixing:
-        return "destructive";
-      case ActivityType.CodeReview:
-        return "outline";
+      case ActivityType.Design:
+      case ActivityType.Requirements:
       case ActivityType.Documentation:
-      case ActivityType.PlanningMeetings:
-      case ActivityType.Research:
+        return "default";
+      case ActivityType.Development:
+      case ActivityType.CodeReview:
+      case ActivityType.BugFixing:
+        return "secondary";
       case ActivityType.Deployment:
-      case ActivityType.Other:
+        return "destructive";
+      case ActivityType.Deployment:
+        return "outline";
       default:
         return "outline";
     }
@@ -71,7 +82,7 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUs
 
   return (
     <div className="space-y-3">
-      {entries.map(entry => {
+      {entries.map((entry) => {
         const isOwner = entry.userId === currentUserId;
         return (
           <Card key={entry.id}>
@@ -99,22 +110,26 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUs
                       <div className="text-xs text-muted-foreground mb-1">
                         Activity
                       </div>
-                      <Badge variant={getActivityBadgeVariant(entry.activityType)}>
+                      <Badge
+                        variant={getActivityBadgeVariant(entry.activityType)}
+                      >
                         {entry.activityType}
                       </Badge>
                     </div>
                   </div>
 
                   {entry.description && (
-                    <div className="mb-2 text-sm">
-                      {entry.description}
-                    </div>
+                    <div className="mb-2 text-sm">{entry.description}</div>
                   )}
 
                   <div className="text-xs text-muted-foreground">
-                    Logged by {entry.userDisplayName} • {formatDateTimeForDisplay(entry.createdAt)}
+                    Logged by {entry.userDisplayName} •{" "}
+                    {formatDateTimeForDisplay(entry.createdAt)}
                     {entry.updatedAt !== entry.createdAt && (
-                      <> • Updated {formatDateTimeForDisplay(entry.updatedAt)}</>
+                      <>
+                        {" "}
+                        • Updated {formatDateTimeForDisplay(entry.updatedAt)}
+                      </>
                     )}
                   </div>
                 </div>
@@ -150,11 +165,20 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({ entries, currentUs
           <Card className="min-w-[400px]">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold mb-3">Delete Time Entry</h3>
-              <p className="mb-4">Are you sure you want to delete this time entry?</p>
+              <p className="mb-4">
+                Are you sure you want to delete this time entry?
+              </p>
               <div className="bg-muted p-3 rounded-md mb-6 space-y-1 text-sm">
-                <div><strong>Date:</strong> {formatDateForDisplay(deleteDialogEntry.date)}</div>
-                <div><strong>Hours:</strong> {deleteDialogEntry.hours}</div>
-                <div><strong>Activity:</strong> {deleteDialogEntry.activityType}</div>
+                <div>
+                  <strong>Date:</strong>{" "}
+                  {formatDateForDisplay(deleteDialogEntry.date)}
+                </div>
+                <div>
+                  <strong>Hours:</strong> {deleteDialogEntry.hours}
+                </div>
+                <div>
+                  <strong>Activity:</strong> {deleteDialogEntry.activityType}
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button

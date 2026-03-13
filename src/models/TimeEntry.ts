@@ -37,15 +37,14 @@ export interface TimeEntry {
  * Activity types for categorizing time entries
  */
 export enum ActivityType {
-  Development = 'Development',
-  CodeReview = 'Code Review',
-  Testing = 'Testing',
-  BugFixing = 'Bug Fixing',
-  Documentation = 'Documentation',
-  PlanningMeetings = 'Planning/Meetings',
-  Research = 'Research',
-  Deployment = 'Deployment',
-  Other = 'Other'
+  Design = "Design",
+  Requirements = "Requirements",
+  Documentation = "Documentation",
+  Development = "Development",
+  CodeReview = "Code Review",
+  BugFixing = "Bug Fixing",
+  Deployment = "Deployment",
+  Testing = "Testing",
 }
 
 /**

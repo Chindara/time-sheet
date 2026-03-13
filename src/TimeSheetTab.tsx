@@ -20,7 +20,7 @@ const TimeSheetTab: React.FC = () => {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
-  const [showReport, setShowReport] = useState(false);
+  const [showReport, setShowReport] = useState(true);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
   const [totalHours, setTotalHours] = useState(0);
 

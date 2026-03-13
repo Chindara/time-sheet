@@ -95,7 +95,7 @@ The system SHALL provide predefined activity types for categorizing time entries
 - **AND** entries MAY be visually differentiated by activity type (e.g., color coding)
 
 ### Requirement: Time Entry Listing
-The system SHALL display all time entries for the current work item in a clear, organized list.
+The system SHALL display all time entries for the current work item in a clear, organized list. When displayed inside the My Timesheet two-column layout, entries SHALL use a compact row format to maximize visible entries within the constrained column width.
 
 #### Scenario: Entries displayed in reverse chronological order
 - **WHEN** viewing the time entry list
@@ -110,6 +110,13 @@ The system SHALL display all time entries for the current work item in a clear, 
   - Hours logged
   - Activity type
   - Description (if provided)
+
+#### Scenario: Compact row display in My Timesheet layout
+- **WHEN** entries are rendered inside the My Timesheet two-column layout
+- **THEN** each entry SHALL be rendered as a compact single-line row (not a full Card)
+- **AND** the date, hours, and activity type badge SHALL appear inline on one line
+- **AND** the description SHALL be truncated to a single line with ellipsis if it overflows
+- **AND** edit and delete actions SHALL be available as icon-only buttons to reduce row width
 
 #### Scenario: Work item summary shows total hours
 - **WHEN** viewing time entries for a work item
