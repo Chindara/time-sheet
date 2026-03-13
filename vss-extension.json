@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "devops-timesheet-extension",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "name": "Time Sheet for Azure DevOps",
   "description": "Track time spent on work items with comprehensive reporting and export capabilities. Log hours, generate timesheet reports, and export data to CSV/Excel.",
   "publisher": "DMSSWE",

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { TimeEntry } from "../../models/TimeEntry";
@@ -83,9 +83,9 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
         </div>
       ) : (
         /* Two-column layout: 2:1 ratio */
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-col md:flex-row gap-0">
           {/* Left column (2/3): Time Entries */}
-          <div className="md:col-span-2 space-y-3">
+          <div className="flex-[2] space-y-3 pr-6">
             {byWorkItem.size === 0 ? (
               <div className="text-center py-12 text-muted-foreground text-sm">
                 No time entries found for the selected period
@@ -164,69 +164,32 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
             )}
           </div>
 
+          {/* Vertical separator */}
+          <div className="hidden md:block w-px bg-border mx-0" />
+
           {/* Right column (1/3): Summary */}
-          <div className="md:col-span-1">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Donut chart */}
-                <ActivityDonutChart
-                  activityHours={activityHours}
-                  totalHours={totalHours}
-                />
+          <div className="flex-1 pl-6 space-y-4">
+            {/* Donut chart */}
+            <ActivityDonutChart
+              activityHours={activityHours}
+              totalHours={totalHours}
+            />
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Hours</div>
-                    <div className="text-xl font-bold">
-                      {totalHours.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Entries</div>
-                    <div className="text-xl font-bold">
-                      {filteredEntries.length}
-                    </div>
-                  </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div>
+                <div className="text-xs text-muted-foreground">Hours</div>
+                <div className="text-xl font-bold">
+                  {totalHours.toFixed(2)}
                 </div>
-
-                {/* Activity breakdown */}
-                {/* {activityHours.size > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      By Activity
-                    </div>
-                    {Array.from(activityHours.entries()).map(
-                      ([activity, hours]) => {
-                        const percentage =
-                          totalHours > 0
-                            ? ((hours / totalHours) * 100).toFixed(1)
-                            : "0";
-                        return (
-                          <div key={activity}>
-                            <div className="flex justify-between text-xs mb-0.5">
-                              <span className="truncate mr-2">{activity}</span>
-                              <span className="text-muted-foreground shrink-0">
-                                {hours.toFixed(2)}h ({percentage}%)
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary transition-all"
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      },
-                    )}
-                  </div>
-                )} */}
-              </CardContent>
-            </Card>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Entries</div>
+                <div className="text-xl font-bold">
+                  {filteredEntries.length}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
