@@ -7,6 +7,7 @@ import { TimeEntry, ActivityType } from "../../models/TimeEntry";
 import {
   formatDateForDisplay,
   formatDateTimeForDisplay,
+  formatTimeForDisplay,
 } from "../../utils/dateUtils";
 
 interface TimeEntryListProps {
@@ -63,8 +64,6 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({
         return "secondary";
       case ActivityType.Deployment:
         return "destructive";
-      case ActivityType.Deployment:
-        return "outline";
       default:
         return "outline";
     }
@@ -89,7 +88,7 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({
             <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <div className="flex gap-6 mb-3">
+                  <div className="flex gap-6 mb-3 flex-wrap">
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">
                         Date
@@ -98,6 +97,16 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({
                         {formatDateForDisplay(entry.date)}
                       </div>
                     </div>
+                    {entry.startTime && entry.endTime ? (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">
+                          Time
+                        </div>
+                        <div className="font-semibold">
+                          {formatTimeForDisplay(entry.startTime)} – {formatTimeForDisplay(entry.endTime)}
+                        </div>
+                      </div>
+                    ) : null}
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">
                         Hours

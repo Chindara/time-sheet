@@ -1,7 +1,7 @@
 {
   "manifestVersion": 1,
   "id": "devops-timesheet-extension",
-  "version": "1.0.1",
+  "version": "1.1.6",
   "name": "Time Sheet",
   "description": "Track time spent on work items with comprehensive reporting and export capabilities. Log hours, generate timesheet reports, and export data to CSV/Excel.",
   "publisher": "iamcpb",
@@ -57,6 +57,17 @@
         "uri": "dist/timesheet-tab.html",
         "height": 600,
         "supportsMobile": false
+      }
+    },
+    {
+      "id": "project-timesheet-hub",
+      "type": "ms.vss-web.hub",
+      "description": "Project-wide time sheet report across all work items and users",
+      "targets": ["ms.vss-work-web.work-hub-group"],
+      "properties": {
+        "name": "Time Sheet",
+        "order": 100,
+        "uri": "dist/project-timesheet.html"
       }
     }
   ],

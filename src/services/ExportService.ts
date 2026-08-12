@@ -1,54 +1,49 @@
 import { TimeEntry } from '../models/TimeEntry';
-import { formatDateForDisplay } from '../utils/dateUtils';
+import { WorkItemMeta } from './WorkItemMetadataService';
+
+/** Column order for every time entry export */
+const HEADERS = [
+  'Work Item ID',
+  'Work Item Title',
+  'Feature',
+  'User Name',
+  'Date',
+  'Start Time',
+  'End Time',
+  'Hours',
+  'Activity Type',
+  'Description',
+  'Created At',
+  'Updated At'
+];
+
+/**
+ * Optional extras the project report supplies to enrich its export
+ */
+export interface ExportContext {
+  /** Work item metadata for title and feature columns */
+  metadata?: Map<number, WorkItemMeta>;
+  /** Summary block written above the rows */
+  summary?: ExportSummary;
+  /** Hours per user id, for the summary block */
+  contributorHours?: Map<string, number>;
+  /** User id to display name, for the summary block */
+  userNames?: Map<string, string>;
+}
 
 /**
  * Service for exporting time entry data to various formats
  */
 export class ExportService {
   /**
-   * Exports time entries to CSV format
+   * Exports time entries to CSV, optionally preceded by a summary block and
+   * enriched with work item titles and their parent feature.
    */
-  exportToCSV(entries: TimeEntry[], filename: string): void {
-    const headers = [
-      'Work Item ID',
-      'User Name',
-      'Date',
-      'Hours',
-      'Activity Type',
-      'Description',
-      'Created At',
-      'Updated At'
-    ];
-
-    const rows = entries.map(entry => [
-      entry.workItemId.toString(),
-      entry.userDisplayName,
-      entry.date,
-      entry.hours.toFixed(2),
-      entry.activityType,
-      entry.description || '',
-      entry.createdAt,
-      entry.updatedAt
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => this.escapeCSVCell(cell)).join(','))
-    ].join('\n');
-
-    this.downloadFile(csvContent, filename, 'text/csv');
-  }
-
-  /**
-   * Exports time entries to Excel-compatible CSV format
-   */
-  exportToExcel(entries: TimeEntry[], filename: string, summary?: ExportSummary): void {
-    // For simplicity, we'll use CSV format which Excel can open
-    // In a production app, you might want to use a library like xlsx for true .xlsx files
+  exportTimeEntries(entries: TimeEntry[], filename: string, context: ExportContext = {}): void {
+    const { metadata, summary, contributorHours, userNames } = context;
 
     let csvContent = '';
 
-    // Add summary if provided
     if (summary) {
       csvContent += 'Summary\n';
       csvContent += `Total Hours,${summary.totalHours.toFixed(2)}\n`;
@@ -56,42 +51,65 @@ export class ExportService {
       csvContent += `Total Entries,${summary.totalEntries}\n`;
       csvContent += '\n';
 
-      if (summary.byActivityType && summary.byActivityType.size > 0) {
+      if (summary.byActivityType.size > 0) {
         csvContent += 'Hours by Activity Type\n';
         summary.byActivityType.forEach((hours, activity) => {
-          csvContent += `${activity},${hours.toFixed(2)}\n`;
+          csvContent += `${this.escapeCSVCell(activity)},${hours.toFixed(2)}\n`;
+        });
+        csvContent += '\n';
+      }
+
+      if (contributorHours && contributorHours.size > 0) {
+        csvContent += 'Hours by Contributor\n';
+        contributorHours.forEach((hours, userId) => {
+          const name = userNames?.get(userId) ?? userId;
+          csvContent += `${this.escapeCSVCell(name)},${hours.toFixed(2)}\n`;
         });
         csvContent += '\n';
       }
     }
 
-    // Add main data
-    const headers = [
-      'Work Item ID',
-      'User Name',
-      'Date',
-      'Hours',
-      'Activity Type',
-      'Description',
-      'Created At',
-      'Updated At'
-    ];
+    const rows = entries.map(entry => {
+      const meta = metadata?.get(entry.workItemId);
+      return [
+        entry.workItemId.toString(),
+        meta?.title ?? '',
+        meta?.rollupTitle ?? '',
+        entry.userDisplayName,
+        entry.date,
+        entry.startTime ?? '',
+        entry.endTime ?? '',
+        entry.hours.toFixed(2),
+        entry.activityType,
+        entry.description || '',
+        entry.createdAt,
+        entry.updatedAt
+      ];
+    });
 
-    const rows = entries.map(entry => [
-      entry.workItemId.toString(),
-      entry.userDisplayName,
-      entry.date,
-      entry.hours.toFixed(2),
-      entry.activityType,
-      entry.description || '',
-      entry.createdAt,
-      entry.updatedAt
-    ]);
+    csvContent += HEADERS.join(',') + '\n';
+    csvContent += rows
+      .map(row => row.map(cell => this.escapeCSVCell(cell)).join(','))
+      .join('\n');
 
-    csvContent += headers.join(',') + '\n';
-    csvContent += rows.map(row => row.map(cell => this.escapeCSVCell(cell)).join(',')).join('\n');
+    this.downloadFile(csvContent, filename, 'text/csv');
+  }
 
-    this.downloadFile(csvContent, filename.replace('.xlsx', '.csv'), 'text/csv');
+  /**
+   * Exports time entries to CSV format
+   */
+  exportToCSV(entries: TimeEntry[], filename: string): void {
+    this.exportTimeEntries(entries, filename);
+  }
+
+  /**
+   * Exports time entries to Excel-compatible CSV format.
+   *
+   * Excel opens CSV directly, so this is the same writer with a forced .csv
+   * extension rather than a real .xlsx workbook.
+   */
+  exportToExcel(entries: TimeEntry[], filename: string, summary?: ExportSummary): void {
+    this.exportTimeEntries(entries, filename.replace('.xlsx', '.csv'), { summary });
   }
 
   /**

@@ -8,6 +8,16 @@ export interface TimeEntry {
   /** ID of the work item this time is logged against */
   workItemId: number;
 
+  /**
+   * GUID of the project the work item belonged to when the entry was created.
+   * Optional: absent on entries created before project stamping existed, which
+   * are attributed via their work item's System.TeamProject instead.
+   */
+  projectId?: string;
+
+  /** Name of the project at creation time (cached for display and fallback matching) */
+  projectName?: string;
+
   /** ID of the user who logged the time */
   userId: string;
 
@@ -16,6 +26,12 @@ export interface TimeEntry {
 
   /** Date when the work was performed (ISO 8601 format) */
   date: string;
+
+  /** Time work began, stored as HH:MM in 24-hour format (optional, absent on legacy entries) */
+  startTime?: string;
+
+  /** Time work ended, stored as HH:MM in 24-hour format (optional, absent on legacy entries) */
+  endTime?: string;
 
   /** Number of hours worked (decimal format, e.g., 1.5) */
   hours: number;
@@ -53,6 +69,8 @@ export enum ActivityType {
 export interface CreateTimeEntryInput {
   workItemId: number;
   date: string;
+  startTime?: string;
+  endTime?: string;
   hours: number;
   description?: string;
   activityType: ActivityType;
@@ -64,6 +82,8 @@ export interface CreateTimeEntryInput {
 export interface UpdateTimeEntryInput {
   id: string;
   date?: string;
+  startTime?: string;
+  endTime?: string;
   hours?: number;
   description?: string;
   activityType?: ActivityType;

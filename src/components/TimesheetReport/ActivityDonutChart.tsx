@@ -1,17 +1,6 @@
 import React from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { ActivityType } from "../../models/TimeEntry";
-
-const ACTIVITY_COLORS: Record<string, string> = {
-  [ActivityType.Design]: "#6366f1",
-  [ActivityType.Requirements]: "#14b8a6",
-  [ActivityType.Documentation]: "#f59e0b",
-  [ActivityType.Development]: "#3b82f6",
-  [ActivityType.CodeReview]: "#8b5cf6",
-  [ActivityType.BugFixing]: "#ef4444",
-  [ActivityType.Deployment]: "#f97316",
-  [ActivityType.Testing]: "#10b981",
-};
+import { activityColor } from "../../utils/activityColors";
 
 interface ActivityDonutChartProps {
   activityHours: Map<string, number>;
@@ -55,10 +44,7 @@ export const ActivityDonutChart: React.FC<ActivityDonutChartProps> = ({
             nameKey="name"
           >
             {chartData.map((entry) => (
-              <Cell
-                key={entry.name}
-                fill={ACTIVITY_COLORS[entry.name] ?? "#6b7280"}
-              />
+              <Cell key={entry.name} fill={activityColor(entry.name)} />
             ))}
           </Pie>
           <Tooltip formatter={(value: number) => [`${value.toFixed(2)}h`]} />
@@ -76,9 +62,7 @@ export const ActivityDonutChart: React.FC<ActivityDonutChartProps> = ({
               <div className="flex items-center gap-1.5 min-w-0">
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: ACTIVITY_COLORS[entry.name] ?? "#6b7280",
-                  }}
+                  style={{ backgroundColor: activityColor(entry.name) }}
                 />
                 <span className="truncate">{entry.name}</span>
               </div>

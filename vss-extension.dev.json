@@ -1,0 +1,6 @@
+{
+  "id": "devops-timesheet-extension-dev",
+  "name": "Time Sheet (dev)",
+  "public": false,
+  "baseUri": "https://localhost:3000"
+}

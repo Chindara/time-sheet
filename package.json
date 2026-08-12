@@ -1,12 +1,14 @@
 {
   "name": "devops-time-sheet",
-  "version": "1.0.0",
+  "version": "1.1.6",
   "description": "Azure DevOps extension for tracking time on work items",
   "main": "dist/timesheet-tab.js",
   "scripts": {
     "build": "npx webpack-cli --mode production",
     "dev": "npx webpack-cli --mode development --watch",
     "package": "npm run build && npx tfx extension create --manifest-globs vss-extension.json",
+    "package:dev": "npx tfx extension create --manifest-globs vss-extension.json --overrides-file vss-extension.dev.json",
+    "serve:dev": "npx webpack serve --config webpack.serve.config.js",
     "preview": "npx webpack serve --config webpack.preview.config.js",
     "preview:build": "npx webpack-cli --config webpack.preview.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -30,8 +32,8 @@
     "lucide-react": "^0.344.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwind-merge": "^2.6.1",
     "recharts": "^2.15.3",
+    "tailwind-merge": "^2.6.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
@@ -50,7 +52,7 @@
     "tfx-cli": "^0.23.1",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.3",
-    "webpack": "^5.105.0",
+    "webpack": "^5.105.4",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.3"
   }

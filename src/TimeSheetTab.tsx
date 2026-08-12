@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import * as SDK from "azure-devops-extension-sdk";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 import { Loader2, Plus, Calendar, AlertCircle } from "lucide-react";
 import {
   TimeEntry,
@@ -11,6 +12,8 @@ import {
 } from "./models/TimeEntry";
 import { dataService } from "./services/DataService";
 import { workItemService } from "./services/WorkItemService";
+import { workItemMetadataService } from "./services/WorkItemMetadataService";
+import { totalHours as sumHours } from "./utils/aggregate";
 import { TimeEntryList } from "./components/TimeEntryList/TimeEntryList";
 import { TimeEntryPanel } from "./components/TimeEntryPanel/TimeEntryPanel";
 import { TimesheetReport } from "./components/TimesheetReport/TimesheetReport";
@@ -25,7 +28,8 @@ const TimeSheetTab: React.FC = () => {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
-  const [showReport, setShowReport] = useState(true);
+  // Opens on the work item being viewed; My Timesheet is one click away
+  const [showReport, setShowReport] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(
     undefined,
   );
@@ -45,6 +49,22 @@ const TimeSheetTab: React.FC = () => {
       await dataService.initialize();
       await workItemService.initialize();
       dataService.setWorkItemService(workItemService);
+
+      // Project context stamps new entries and lets My Timesheet exclude other
+      // projects. Non-fatal: "This work item" needs none of it, so a failure
+      // here must not take down the whole tab.
+      try {
+        await workItemMetadataService.initialize();
+        dataService.setProjectContext({
+          id: workItemMetadataService.getProjectId(),
+          name: workItemMetadataService.getProjectName(),
+        });
+      } catch (metadataErr) {
+        console.warn(
+          "Project context unavailable; My Timesheet will not be project-scoped:",
+          metadataErr,
+        );
+      }
 
       // Get current work item
       const id = await workItemService.getCurrentWorkItemId();
@@ -71,8 +91,7 @@ const TimeSheetTab: React.FC = () => {
       setEntries(entries);
 
       // Calculate total hours
-      const total = dataService.calculateTotalHours(entries);
-      setTotalHours(total);
+      setTotalHours(sumHours(entries));
     } catch (err) {
       console.error("Failed to load entries:", err);
       setError("Failed to load time entries");
@@ -180,14 +199,47 @@ const TimeSheetTab: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold">Time Sheet</h2>
             <p className="text-sm text-muted-foreground">
-              Total hours logged: {totalHours.toFixed(2)}
+              {showReport
+                ? `Total hours on work item #${workItemId}: ${totalHours.toFixed(2)}`
+                : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} on work item #${workItemId} · ${totalHours.toFixed(2)} hours`}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={handleLogTimeClick}
-              disabled={showForm}
+          <div className="flex items-center gap-2">
+            {/* Scope switch: My Timesheet spans every work item, so this is the
+                only way back to the entries on the work item being viewed */}
+            <div
+              className="flex overflow-hidden rounded-md border"
+              role="group"
+              aria-label="View"
             >
+              <button
+                type="button"
+                aria-pressed={showReport}
+                onClick={() => setShowReport(true)}
+                className={cn(
+                  "border-r px-3 py-2 text-sm",
+                  showReport
+                    ? "bg-primary/10 font-semibold text-primary"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                My Timesheet
+              </button>
+              <button
+                type="button"
+                aria-pressed={!showReport}
+                onClick={() => setShowReport(false)}
+                className={cn(
+                  "px-3 py-2 text-sm",
+                  !showReport
+                    ? "bg-primary/10 font-semibold text-primary"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                This work item
+              </button>
+            </div>
+            <Button onClick={handleLogTimeClick} disabled={showForm}>
               Log Time
             </Button>
           </div>
@@ -239,12 +291,21 @@ const TimeSheetTab: React.FC = () => {
 
       {/* Content */}
       <div className="p-6">
-        <TimesheetReport
-          onClose={() => setShowReport(false)}
-          onEdit={handleEditEntry}
-          onDelete={handleDeleteEntry}
-          refreshKey={reportRefreshKey}
-        />
+        {showReport ? (
+          <TimesheetReport
+            onClose={() => setShowReport(false)}
+            onEdit={handleEditEntry}
+            onDelete={handleDeleteEntry}
+            refreshKey={reportRefreshKey}
+          />
+        ) : (
+          <TimeEntryList
+            entries={entries}
+            currentUserId={currentUserId}
+            onEdit={handleEditEntry}
+            onDelete={handleDeleteEntry}
+          />
+        )}
         <TimeEntryPanel
           isOpen={showForm}
           workItemId={workItemId!}
@@ -260,6 +321,9 @@ const TimeSheetTab: React.FC = () => {
 // Initialize SDK and render the component
 SDK.init().then(async () => {
   try {
+    console.log(
+      `Time Sheet tab v${typeof __EXTENSION_VERSION__ === "string" ? __EXTENSION_VERSION__ : "unknown"} starting`,
+    );
     // Wait for SDK to be fully ready
     await SDK.ready();
 

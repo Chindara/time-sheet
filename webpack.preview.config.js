@@ -1,6 +1,13 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
+/**
+ * Local UI preview — no Azure DevOps, no SDK, mock data only.
+ *
+ * Mirrors the resolve/loader setup of webpack.config.js: without the `@` alias
+ * every `@/components/ui/*` import fails, and without postcss-loader Tailwind
+ * never compiles, which is what left this harness unusable.
+ */
 module.exports = {
   mode: 'development',
   entry: './src/preview.tsx',
@@ -10,7 +17,10 @@ module.exports = {
     clean: true
   },
   resolve: {
-    extensions: ['.ts', '.tsx', '.js', '.jsx']
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    alias: {
+      '@': path.resolve(__dirname, 'src')
+    }
   },
   module: {
     rules: [
@@ -21,7 +31,7 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader']
+        use: ['style-loader', 'css-loader', 'postcss-loader']
       },
       {
         test: /\.(woff|woff2|eot|ttf|otf)$/,

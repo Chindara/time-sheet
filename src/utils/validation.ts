@@ -51,6 +51,15 @@ export function validateCreateTimeEntry(input: CreateTimeEntryInput): Validation
     });
   }
 
+  // Validate time range if provided
+  if (input.startTime || input.endTime) {
+    if (!input.startTime || !input.endTime) {
+      errors.push({ field: 'startTime', message: 'Both Start Time and End Time are required' });
+    } else if (calculateHoursFromRange(input.startTime, input.endTime) <= 0) {
+      errors.push({ field: 'endTime', message: 'End Time must be after Start Time' });
+    }
+  }
+
   // Validate description length if provided
   if (input.description && input.description.length > 500) {
     errors.push({
@@ -99,6 +108,15 @@ export function validateUpdateTimeEntry(input: UpdateTimeEntryInput): Validation
     });
   }
 
+  // Validate time range if provided
+  if (input.startTime || input.endTime) {
+    if (!input.startTime || !input.endTime) {
+      errors.push({ field: 'startTime', message: 'Both Start Time and End Time are required' });
+    } else if (calculateHoursFromRange(input.startTime, input.endTime) <= 0) {
+      errors.push({ field: 'endTime', message: 'End Time must be after Start Time' });
+    }
+  }
+
   // Validate description length if provided
   if (input.description !== undefined && input.description.length > 500) {
     errors.push({
@@ -143,6 +161,16 @@ export function formatDateToISO(date: Date): string {
  */
 export function formatDateTimeToISO(date: Date): string {
   return date.toISOString();
+}
+
+/**
+ * Calculates decimal hours from a start and end time string ("HH:MM" 24-hour format).
+ * Returns a positive number if endTime > startTime, zero or negative otherwise.
+ */
+export function calculateHoursFromRange(startTime: string, endTime: string): number {
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const [endHour, endMin] = endTime.split(':').map(Number);
+  return ((endHour * 60 + endMin) - (startHour * 60 + startMin)) / 60;
 }
 
 /**

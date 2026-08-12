@@ -6,7 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { TimeEntry } from "../../models/TimeEntry";
 import { dataService } from "../../services/DataService";
-import { formatDateForDisplay } from "../../utils/dateUtils";
+import { workItemMetadataService } from "../../services/WorkItemMetadataService";
+import { partitionByProject } from "../../utils/projectScope";
+import {
+  formatDateForDisplay,
+  formatTimeForDisplay,
+} from "../../utils/dateUtils";
+import {
+  groupByWorkItem,
+  hoursByActivity,
+  sortByDateDesc,
+  totalHours as sumHours,
+} from "../../utils/aggregate";
 import { ActivityDonutChart } from "./ActivityDonutChart";
 
 interface TimesheetReportProps {
@@ -36,8 +47,37 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
     try {
       setIsLoading(true);
       setError("");
+
       const timeEntries = await dataService.getAllUserTimeEntries();
-      setEntries(timeEntries);
+
+      // Storage is account-wide, so this returns the user's entries from every
+      // project in the organization. Narrow to the project being viewed.
+      const project = {
+        id: workItemMetadataService.getProjectId(),
+        name: workItemMetadataService.getProjectName(),
+      };
+
+      // No project context means scoping is impossible. These are the viewer's
+      // own entries, so showing a few from another project is untidy rather
+      // than a disclosure — far better than blanking their timesheet.
+      if (!project.id && !project.name) {
+        console.warn("No project context; showing all of the user's entries");
+        setEntries(timeEntries);
+        return;
+      }
+
+      const candidates = timeEntries.filter(
+        (entry) =>
+          (!entry.projectId && !entry.projectName) ||
+          entry.projectId === project.id ||
+          entry.projectName === project.name,
+      );
+
+      const metadata = await workItemMetadataService.getMetadata(
+        Array.from(new Set(candidates.map((e) => e.workItemId))),
+      );
+
+      setEntries(partitionByProject(candidates, metadata, project).inProject);
     } catch (err) {
       console.error("Failed to load timesheet:", err);
       setError("Failed to load timesheet data");
@@ -48,24 +88,10 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
 
   // Calculate totals
   const filteredEntries = entries;
-  const totalHours = entries.reduce((sum, e) => sum + e.hours, 0);
+  const totalHours = sumHours(filteredEntries);
 
-  // Group by work item
-  const byWorkItem = new Map<number, TimeEntry[]>();
-  filteredEntries.forEach((entry) => {
-    const existing = byWorkItem.get(entry.workItemId) || [];
-    existing.push(entry);
-    byWorkItem.set(entry.workItemId, existing);
-  });
-
-  // Group by activity type for breakdown and chart
-  const byActivity = dataService.groupByActivityType(filteredEntries);
-
-  // Compute hours per activity for the donut chart
-  const activityHours = new Map<string, number>();
-  byActivity.forEach((actEntries, activity) => {
-    activityHours.set(activity, dataService.calculateTotalHours(actEntries));
-  });
+  const byWorkItem = groupByWorkItem(filteredEntries);
+  const activityHours = hoursByActivity(filteredEntries);
 
   return (
     <div className="space-y-4">
@@ -93,8 +119,7 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
             ) : (
               Array.from(byWorkItem.entries()).map(
                 ([workItemId, workItemEntries]) => {
-                  const workItemTotal =
-                    dataService.calculateTotalHours(workItemEntries);
+                  const workItemTotal = sumHours(workItemEntries);
                   return (
                     <div
                       key={workItemId}
@@ -112,53 +137,58 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
 
                       {/* Compact entry rows */}
                       <div className="divide-y">
-                        {workItemEntries
-                          .slice()
-                          .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
-                          .map((entry) => (
-                          <div
-                            key={entry.id}
-                            className="px-3 py-2 flex items-center gap-3 text-sm hover:bg-muted/20"
-                          >
-                            <span className="text-muted-foreground w-[90px] shrink-0">
-                              {formatDateForDisplay(entry.date)}
-                            </span>
-                            <span className="font-medium w-[50px] shrink-0 text-right">
-                              {entry.hours.toFixed(2)}h
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-xs shrink-0"
+                        {sortByDateDesc(workItemEntries).map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="px-3 py-2 flex items-center gap-3 text-sm hover:bg-muted/20"
                             >
-                              {entry.activityType}
-                            </Badge>
-                            {entry.description && (
-                              <span className="text-muted-foreground truncate flex-1 text-xs">
-                                {entry.description}
+                              <span className="text-muted-foreground w-[90px] shrink-0">
+                                {formatDateForDisplay(entry.date)}
                               </span>
-                            )}
-                            <div className="flex gap-1 ml-auto shrink-0">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                title="Edit"
-                                onClick={() => onEdit?.(entry)}
+                              {entry.startTime && entry.endTime ? (
+                                <span className="text-muted-foreground w-[140px] shrink-0 text-xs">
+                                  {formatTimeForDisplay(entry.startTime)} –{" "}
+                                  {formatTimeForDisplay(entry.endTime)}
+                                </span>
+                              ) : (
+                                <span className="w-[140px] shrink-0" />
+                              )}
+                              <span className="font-medium w-[50px] shrink-0 text-right">
+                                {entry.hours.toFixed(2)}h
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-xs shrink-0"
                               >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-destructive hover:text-destructive"
-                                title="Delete"
-                                onClick={() => setDeleteConfirmEntry(entry)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                                {entry.activityType}
+                              </Badge>
+                              {entry.description && (
+                                <span className="text-muted-foreground truncate flex-1 text-xs">
+                                  {entry.description}
+                                </span>
+                              )}
+                              <div className="flex gap-1 ml-auto shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title="Edit"
+                                  onClick={() => onEdit?.(entry)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  title="Delete"
+                                  onClick={() => setDeleteConfirmEntry(entry)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
                   );
@@ -182,9 +212,7 @@ export const TimesheetReport: React.FC<TimesheetReportProps> = ({
             <div className="grid grid-cols-2 gap-2 text-center">
               <div>
                 <div className="text-xs text-muted-foreground">Hours</div>
-                <div className="text-xl font-bold">
-                  {totalHours.toFixed(2)}
-                </div>
+                <div className="text-xl font-bold">{totalHours.toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Entries</div>

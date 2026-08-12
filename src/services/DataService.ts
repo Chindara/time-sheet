@@ -1,12 +1,20 @@
 import * as SDK from 'azure-devops-extension-sdk';
 import { IExtensionDataManager, IExtensionDataService } from 'azure-devops-extension-api';
 import { TimeEntry, CreateTimeEntryInput, UpdateTimeEntryInput, TimeEntryQuery } from '../models/TimeEntry';
-import { validateCreateTimeEntry, validateUpdateTimeEntry, formatDateToISO, formatDateTimeToISO } from '../utils/validation';
+import { validateCreateTimeEntry, validateUpdateTimeEntry, formatDateTimeToISO } from '../utils/validation';
+import { totalHours } from '../utils/aggregate';
 import { v4 as uuidv4 } from 'uuid';
 import { WorkItemService } from './WorkItemService';
 
 const COLLECTION_NAME = 'TimeEntries';
 const DOCUMENT_ID_PREFIX = 'entry-';
+
+/**
+ * Work item types whose state is moved automatically when time is logged.
+ * Limited to the leaf types users log against, all of which share the
+ * New / In Development / In Testing / Closed state model.
+ */
+const TRANSITIONING_TYPES = ['Task', 'Bug', 'Suggestion'];
 
 /**
  * Service for managing time entry data using Azure DevOps Extension Data Storage
@@ -15,12 +23,23 @@ export class DataService {
   private dataManager: IExtensionDataManager | null = null;
   private currentUser: { id: string; displayName: string } | null = null;
   private workItemService: WorkItemService | null = null;
+  private project: { id: string; name: string } | null = null;
 
   /**
    * Provides a WorkItemService instance for field write-back after time entry mutations.
    */
   setWorkItemService(service: WorkItemService): void {
     this.workItemService = service;
+  }
+
+  /**
+   * Provides the current project so new entries can be stamped with it.
+   *
+   * Documents live in the extension's account-wide default scope, which has no
+   * project dimension, so the project has to be recorded on the entry itself.
+   */
+  setProjectContext(project: { id: string; name: string }): void {
+    this.project = project;
   }
 
   /**
@@ -98,9 +117,13 @@ export class DataService {
     const entry: TimeEntry = {
       id: uuidv4(),
       workItemId: input.workItemId,
+      projectId: this.project?.id,
+      projectName: this.project?.name,
       userId: this.currentUser.id,
       userDisplayName: this.currentUser.displayName,
       date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
       hours: input.hours,
       description: input.description,
       activityType: input.activityType,
@@ -114,9 +137,13 @@ export class DataService {
         id: `${DOCUMENT_ID_PREFIX}${entry.id}`,
         entryId: entry.id,
         workItemId: entry.workItemId,
+        projectId: entry.projectId,
+        projectName: entry.projectName,
         userId: entry.userId,
         userDisplayName: entry.userDisplayName,
         date: entry.date,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
         hours: entry.hours,
         description: entry.description,
         activityType: entry.activityType,
@@ -167,6 +194,8 @@ export class DataService {
       const updated: TimeEntry = {
         ...existing,
         date: input.date ?? existing.date,
+        startTime: input.startTime ?? existing.startTime,
+        endTime: input.endTime ?? existing.endTime,
         hours: input.hours ?? existing.hours,
         description: input.description ?? existing.description,
         activityType: input.activityType ?? existing.activityType,
@@ -178,9 +207,13 @@ export class DataService {
         id: `${DOCUMENT_ID_PREFIX}${updated.id}`,
         entryId: updated.id,
         workItemId: updated.workItemId,
+        projectId: updated.projectId,
+        projectName: updated.projectName,
         userId: updated.userId,
         userDisplayName: updated.userDisplayName,
         date: updated.date,
+        startTime: updated.startTime,
+        endTime: updated.endTime,
         hours: updated.hours,
         description: updated.description,
         activityType: updated.activityType,
@@ -362,40 +395,14 @@ export class DataService {
   }
 
   /**
-   * Calculates total hours for a set of time entries
+   * Gets every user's time entries for a date range.
+   *
+   * Documents are written without a scopeType, so they live in the extension's
+   * account-wide default scope and are readable across users — the
+   * per-user reports are user-scoped only because they pass a userId filter.
    */
-  calculateTotalHours(entries: TimeEntry[]): number {
-    return entries.reduce((sum, entry) => sum + entry.hours, 0);
-  }
-
-  /**
-   * Groups time entries by activity type
-   */
-  groupByActivityType(entries: TimeEntry[]): Map<string, TimeEntry[]> {
-    const grouped = new Map<string, TimeEntry[]>();
-
-    for (const entry of entries) {
-      const existing = grouped.get(entry.activityType) || [];
-      existing.push(entry);
-      grouped.set(entry.activityType, existing);
-    }
-
-    return grouped;
-  }
-
-  /**
-   * Groups time entries by date
-   */
-  groupByDate(entries: TimeEntry[]): Map<string, TimeEntry[]> {
-    const grouped = new Map<string, TimeEntry[]>();
-
-    for (const entry of entries) {
-      const existing = grouped.get(entry.date) || [];
-      existing.push(entry);
-      grouped.set(entry.date, existing);
-    }
-
-    return grouped;
+  async getAllProjectTimeEntries(startDate?: string, endDate?: string): Promise<TimeEntry[]> {
+    return this.queryTimeEntries({ startDate, endDate });
   }
 
   /**
@@ -409,7 +416,7 @@ export class DataService {
 
     try {
       const entries = await this.getTimeEntriesForWorkItem(workItemId);
-      const completedWork = entries.reduce((sum, e) => sum + e.hours, 0);
+      const completedWork = totalHours(entries);
 
       const fieldValues = await this.workItemService.getFieldValues([
         'Microsoft.VSTS.Scheduling.OriginalEstimate'
@@ -442,7 +449,7 @@ export class DataService {
 
     try {
       const type = await this.workItemService.getWorkItemType();
-      if (type !== 'Task' && type !== 'Bug') {
+      if (!TRANSITIONING_TYPES.includes(type)) {
         return true;
       }
       await this.workItemService.setWorkItemState(state);
@@ -460,9 +467,13 @@ export class DataService {
     return {
       id: doc.entryId,
       workItemId: doc.workItemId,
+      projectId: doc.projectId,
+      projectName: doc.projectName,
       userId: doc.userId,
       userDisplayName: doc.userDisplayName,
       date: doc.date,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
       hours: doc.hours,
       description: doc.description,
       activityType: doc.activityType,
