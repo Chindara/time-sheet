@@ -9,19 +9,38 @@ npm run preview
 ```
 
 Opens <http://localhost:3000> with mock data covering an
-Epic > Feature > User Story > Task/Bug/Suggestion hierarchy, plus one entry
-stamped with a different project so you can watch the scoping filter drop it.
+Epic > Feature > User Story > Task/Bug/Suggestion hierarchy, dated relative to
+today so the date presets always have something to show.
 
-Toggles at the top switch the group-by dimension, add or remove the foreign
-entry, and swap to the work-item entry list.
+Both surfaces render through the components the extension ships —
+`ProjectTimesheetView` and `WorkItemTimesheetView` — so the layout, filters and
+empty states are the real ones. Only the containers are replaced: `preview.tsx`
+stands in for storage, work item metadata and the REST client.
 
-**Good for:** layout, grouping, charts, empty states, totals reconciliation.
+The bar at the top is the only preview-only chrome. It switches surface and
+drives the states that are otherwise hard to reach:
+
+| Toggle | What it exercises |
+| --- | --- |
+| Project hub / Work item tab | The two surfaces |
+| Empty project | The "no time logged yet" state |
+| Other project's entry | Project scoping dropping a foreign entry |
+| Unattributable entry | The disclosure banner for entries that match neither project |
+| Work item lookup fails | The metadata error alert and the "cannot attribute" empty state |
+| Field sync fails | The sync and state-transition warnings on the tab |
+| Reset data | Back to the seed set |
+
+On the tab, Log Time, edit and delete write to an in-memory list, so the panel,
+the form's validation and the owner-only controls can be driven end to end.
+
+**Good for:** layout, filters, charts, empty states, the entry form, totals
+reconciliation.
 
 **Cannot tell you anything about:** extension storage, work item metadata, the
 REST client, permissions, or state transitions. None of that is exercised here —
-the hub's container is bypassed and its presentational parts are rendered
-directly. Every bug reported in this project so far lived in the parts this
-loop does not reach, so do not treat a clean preview as a green light.
+both containers are bypassed. Every bug reported in this project so far lived in
+the parts this loop does not reach, so do not treat a clean preview as a green
+light.
 
 ## 2. Real Azure DevOps, served from localhost
 

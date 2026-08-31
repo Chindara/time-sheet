@@ -3,38 +3,44 @@
  *
  * Run: npm run preview
  *
- * The hub's container (ProjectTimesheet) talks to the SDK on mount, so this
- * renders its presentational parts directly against a fixed data set. That
- * covers layout, grouping, charts and empty states — the parts worth iterating
- * on locally. Anything touching storage, work item metadata or the REST client
- * has to be exercised in a real project; see docs/LOCAL_TESTING.md.
+ * Both surfaces are rendered through the same view components the extension
+ * ships — ProjectTimesheetView and WorkItemTimesheetView — so what shows here
+ * is the real layout, filters and empty states rather than a copy that drifts.
+ * Only the containers are replaced: this file plays the part of storage, work
+ * item metadata and the REST client, none of which are exercised. Anything that
+ * depends on them for real has to be tried in a project; see
+ * docs/LOCAL_TESTING.md.
  */
 
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { TimeEntry, ActivityType } from './models/TimeEntry';
+import {
+  TimeEntry,
+  ActivityType,
+  CreateTimeEntryInput,
+  UpdateTimeEntryInput
+} from './models/TimeEntry';
 import { WorkItemMeta } from './services/WorkItemMetadataService';
-import { TimeEntryList } from './components/TimeEntryList/TimeEntryList';
-import { BreakdownTable } from './components/ProjectTimesheet/BreakdownTable';
-import { ProjectKpis } from './components/ProjectTimesheet/ProjectKpis';
-import { ContributorBars } from './components/ProjectTimesheet/ContributorBars';
-import { DailyHoursChart, DailyPoint, DailySeries } from './components/ProjectTimesheet/DailyHoursChart';
-import { ActivityDonutChart } from './components/TimesheetReport/ActivityDonutChart';
-import { buildBreakdown, buildSummary, GroupBy, GROUP_BY_LABELS } from './utils/breakdown';
-import { hoursByUser } from './utils/aggregate';
-import { ACTIVITY_ORDER } from './utils/activityColors';
-import { buildContributorColors } from './utils/contributorColors';
+import { ProjectTimesheetView } from './components/ProjectTimesheet/ProjectTimesheetView';
+import { WorkItemTimesheetView } from './components/WorkItemTimesheet/WorkItemTimesheetView';
 import { partitionByProject } from './utils/projectScope';
+import { formatDateToISO } from './utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import './styles.css';
 
 const PROJECT = { id: 'guid-web', name: 'Web Platform' };
 
+/** The work item whose tab the preview stands in for */
+const TAB_WORK_ITEM = 1101;
+
+/** Whose entries carry edit and delete controls in the preview */
+const CURRENT_USER = 'u1';
+
 // Epic > Feature > User Story > Task | Bug | Suggestion
 const META: WorkItemMeta[] = [
-  { id: 900, title: 'Customer Platform', workItemType: 'Epic', state: 'Active', areaPath: 'Web Platform', projectName: 'Web Platform' },
-  { id: 1042, title: 'Customer Onboarding Revamp', workItemType: 'Feature', state: 'Active', areaPath: 'Web Platform', projectName: 'Web Platform', parentId: 900, rollupId: 1042, rollupTitle: 'Customer Onboarding Revamp', rollupType: 'Feature' },
-  { id: 1058, title: 'Billing & Invoicing', workItemType: 'Feature', state: 'Active', areaPath: 'Web Platform\\Billing', projectName: 'Web Platform', parentId: 900, rollupId: 1058, rollupTitle: 'Billing & Invoicing', rollupType: 'Feature' },
+  { id: 900, title: 'Customer Platform', workItemType: 'Epic', state: 'Active', iterationPath: 'Web Platform\\Sprint 12', projectName: 'Web Platform' },
+  { id: 1042, title: 'Customer Onboarding Revamp', workItemType: 'Feature', state: 'Active', iterationPath: 'Web Platform\\Sprint 12', projectName: 'Web Platform', parentId: 900, rollupId: 1042, rollupTitle: 'Customer Onboarding Revamp', rollupType: 'Feature' },
+  { id: 1058, title: 'Billing & Invoicing', workItemType: 'Feature', state: 'Active', iterationPath: 'Web Platform\\Sprint 13', projectName: 'Web Platform', parentId: 900, rollupId: 1058, rollupTitle: 'Billing & Invoicing', rollupType: 'Feature' },
 ];
 
 function leaf(
@@ -45,10 +51,10 @@ function leaf(
   rollupId: number | undefined,
   rollupTitle: string | undefined,
   estimate?: number,
-  areaPath = 'Web Platform'
+  iterationPath = 'Web Platform\\Sprint 12'
 ): WorkItemMeta {
   return {
-    id, title, workItemType: type, state, areaPath, projectName: 'Web Platform',
+    id, title, workItemType: type, state, iterationPath, projectName: 'Web Platform',
     rollupId, rollupTitle, rollupType: rollupId ? 'Feature' : undefined, originalEstimate: estimate
   };
 }
@@ -56,236 +62,262 @@ function leaf(
 const metadata = new Map<number, WorkItemMeta>();
 [
   ...META,
-  leaf(1101, 'Build signup wizard', 'Task', 'Closed', 1042, 'Customer Onboarding Revamp', 20),
+  leaf(TAB_WORK_ITEM, 'Build signup wizard', 'Task', 'Closed', 1042, 'Customer Onboarding Revamp', 20),
   leaf(1119, 'Wizard back button loses state', 'Bug', 'In Development', 1042, 'Customer Onboarding Revamp', 8),
   leaf(1122, 'Add a progress indicator', 'Suggestion', 'In Testing', 1042, 'Customer Onboarding Revamp', 6),
-  leaf(1145, 'Stripe webhook handler', 'Task', 'In Development', 1058, 'Billing & Invoicing', 24, 'Web Platform\\Billing'),
-  leaf(1163, 'Proration miscalculated', 'Bug', 'New', 1058, 'Billing & Invoicing', 10, 'Web Platform\\Billing'),
+  leaf(1145, 'Stripe webhook handler', 'Task', 'In Development', 1058, 'Billing & Invoicing', 24, 'Web Platform\\Sprint 13'),
+  leaf(1163, 'Proration miscalculated', 'Bug', 'New', 1058, 'Billing & Invoicing', 10, 'Web Platform\\Sprint 13'),
   leaf(1222, 'Login page 500 on Safari', 'Bug', 'Closed', undefined, undefined, 4),
 ].forEach(m => metadata.set(m.id, m));
+
+/**
+ * Dates are relative to today rather than fixed, so the date presets and the
+ * working-day maths have data to work with whenever the preview is run.
+ */
+function daysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return formatDateToISO(date);
+}
 
 let seq = 0;
 function entry(
   workItemId: number,
   userId: string,
   name: string,
-  date: string,
+  daysBack: number,
   startTime: string,
   hours: number,
-  activityType: ActivityType
+  activityType: ActivityType,
+  description?: string
 ): TimeEntry {
   seq++;
+  const date = daysAgo(daysBack);
   const [h, m] = startTime.split(':').map(Number);
   const endMinutes = h * 60 + m + Math.round(hours * 60);
   const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
   return {
     id: `e${seq}`, workItemId, projectId: PROJECT.id, projectName: PROJECT.name,
     userId, userDisplayName: name, date, startTime, endTime, hours,
-    description: undefined, activityType,
+    description, activityType,
     createdAt: `${date}T${startTime}:00Z`, updatedAt: `${date}T${startTime}:00Z`
   };
 }
 
-const ENTRIES: TimeEntry[] = [
-  entry(1101, 'u1', 'Priya Raman', '2026-08-03', '09:00', 4.5, ActivityType.Development),
-  entry(1101, 'u1', 'Priya Raman', '2026-08-04', '09:15', 3.25, ActivityType.Development),
-  entry(1119, 'u2', 'Daniel Osei', '2026-08-04', '13:00', 2.5, ActivityType.BugFixing),
-  entry(1122, 'u3', 'Mei Tanaka', '2026-08-05', '10:00', 3, ActivityType.Design),
-  entry(1145, 'u2', 'Daniel Osei', '2026-08-05', '09:00', 6, ActivityType.Development),
-  entry(1145, 'u2', 'Daniel Osei', '2026-08-06', '09:00', 5.5, ActivityType.Development),
-  entry(1163, 'u1', 'Priya Raman', '2026-08-06', '14:00', 2, ActivityType.BugFixing),
-  entry(1222, 'u4', 'Aisha Bello', '2026-08-07', '11:00', 3.75, ActivityType.Testing),
-  entry(1101, 'u4', 'Aisha Bello', '2026-08-07', '15:00', 1.5, ActivityType.CodeReview),
-  entry(1145, 'u3', 'Mei Tanaka', '2026-08-10', '09:30', 4, ActivityType.Documentation),
-  entry(1119, 'u2', 'Daniel Osei', '2026-08-11', '09:00', 2.25, ActivityType.Deployment),
-  entry(1163, 'u1', 'Priya Raman', '2026-08-11', '13:30', 3, ActivityType.Requirements),
+const SEED_ENTRIES: TimeEntry[] = [
+  entry(TAB_WORK_ITEM, 'u1', 'Priya Raman', 20, '09:00', 4.5, ActivityType.Development, 'Wizard shell, routing and the step model.'),
+  entry(TAB_WORK_ITEM, 'u1', 'Priya Raman', 19, '09:15', 3.25, ActivityType.Development),
+  entry(1119, 'u2', 'Daniel Osei', 19, '13:00', 2.5, ActivityType.BugFixing),
+  entry(1122, 'u3', 'Mei Tanaka', 18, '10:00', 3, ActivityType.Design),
+  entry(1145, 'u2', 'Daniel Osei', 18, '09:00', 6, ActivityType.Development),
+  entry(1145, 'u2', 'Daniel Osei', 17, '09:00', 5.5, ActivityType.Development),
+  entry(1163, 'u1', 'Priya Raman', 17, '14:00', 2, ActivityType.BugFixing),
+  entry(1222, 'u4', 'Aisha Bello', 16, '11:00', 3.75, ActivityType.Testing),
+  entry(TAB_WORK_ITEM, 'u4', 'Aisha Bello', 16, '15:00', 1.5, ActivityType.CodeReview, 'Reviewed the wizard PR.'),
+  entry(1145, 'u3', 'Mei Tanaka', 13, '09:30', 4, ActivityType.Documentation),
+  entry(1119, 'u2', 'Daniel Osei', 12, '09:00', 2.25, ActivityType.Deployment),
+  entry(1163, 'u1', 'Priya Raman', 12, '13:30', 3, ActivityType.Requirements),
+  entry(TAB_WORK_ITEM, 'u1', 'Priya Raman', 4, '10:00', 2.75, ActivityType.Development),
+  entry(1145, 'u2', 'Daniel Osei', 2, '09:00', 4, ActivityType.Development),
 ];
 
 // An entry from another project, to prove the scoping filter drops it
 const FOREIGN: TimeEntry = {
-  ...entry(7777, 'u1', 'Priya Raman', '2026-08-10', '09:00', 8, ActivityType.Development),
+  ...entry(7777, 'u1', 'Priya Raman', 13, '09:00', 8, ActivityType.Development),
   projectId: 'guid-mobile',
   projectName: 'Mobile App'
 };
 
-const RANGE = { start: '2026-08-01', end: '2026-08-31' };
+// An entry with no project stamp on an unreadable work item: attributable
+// neither way, so the report has to disclose it rather than count it
+const UNATTRIBUTED: TimeEntry = {
+  ...entry(9999, 'u3', 'Mei Tanaka', 15, '11:00', 1.5, ActivityType.Testing),
+  projectId: undefined,
+  projectName: undefined
+};
 
-const Panel: React.FC<{ title: string; subtitle?: string; children: React.ReactNode; flush?: boolean }> = ({
-  title, subtitle, children, flush
-}) => (
-  <section className="overflow-hidden rounded-md border bg-card">
-    <div className="flex items-center gap-3 border-b px-4 py-2.5">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
-    </div>
-    <div className={flush ? '' : 'p-4'}>{children}</div>
-  </section>
+const METADATA_ERROR =
+  'getWorkItems (fields, 50 ids) did not respond within 12000ms';
+
+type Surface = 'hub' | 'tab';
+
+const Toggle: React.FC<{
+  on: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ on, onClick, children }) => (
+  <Button size="sm" variant={on ? 'default' : 'outline'} onClick={onClick}>
+    {children}
+  </Button>
 );
 
 const PreviewApp: React.FC = () => {
-  const [groupBy, setGroupBy] = useState<GroupBy>('feature');
+  const [surface, setSurface] = useState<Surface>('hub');
+  const [entries, setEntries] = useState<TimeEntry[]>(SEED_ENTRIES);
   const [includeForeign, setIncludeForeign] = useState(true);
-  const [showTab, setShowTab] = useState(false);
+  const [includeUnattributed, setIncludeUnattributed] = useState(false);
+  const [emptyProject, setEmptyProject] = useState(false);
+  const [failMetadata, setFailMetadata] = useState(false);
+  const [failSync, setFailSync] = useState(false);
+  const [syncWarning, setSyncWarning] = useState(false);
+  const [stateWarning, setStateWarning] = useState(false);
 
-  const all = includeForeign ? [...ENTRIES, FOREIGN] : ENTRIES;
-  const { inProject, otherProject } = partitionByProject(all, metadata, PROJECT);
+  const dataset = emptyProject
+    ? []
+    : [
+        ...entries,
+        ...(includeForeign ? [FOREIGN] : []),
+        ...(includeUnattributed ? [UNATTRIBUTED] : [])
+      ];
 
-  const summary = buildSummary(inProject, metadata, RANGE.start, RANGE.end);
-  const rows = buildBreakdown(inProject, metadata, groupBy);
+  const partition = partitionByProject(dataset, metadata, PROJECT);
 
-  const closed = (() => {
-    let n = 0;
-    new Set(inProject.map(e => e.workItemId)).forEach(id => {
-      if (['Closed', 'Done', 'Completed', 'Resolved', 'Removed'].includes(metadata.get(id)?.state ?? '')) n++;
-    });
-    return n;
-  })();
+  /* Storage stands in for the data service: mutations land in memory, so the
+     panel, the form and the ownership rules can be driven end to end. */
+  const [seqRef] = useState(() => ({ next: 0 }));
+  const nextId = () => `p${(seqRef.next += 1)}`;
 
-  const contributorNames = new Map(inProject.map(e => [e.userId, e.userDisplayName]));
-  const contributors = Array.from(hoursByUser(inProject).entries())
-    .map(([userId, hours]) => ({ userId, displayName: contributorNames.get(userId) ?? userId, hours }))
-    .sort((a, b) => b.hours - a.hours);
+  const handleSave = async (input: CreateTimeEntryInput | UpdateTimeEntryInput) => {
+    if (failSync) setSyncWarning(true);
 
-  const dailyPoints: DailyPoint[] = (() => {
-    const byDate = new Map<string, DailyPoint>();
-    inProject.forEach(entry => {
-      let point = byDate.get(entry.date);
-      if (!point) {
-        point = { date: entry.date, hours: 0, byUser: {} };
-        byDate.set(entry.date, point);
-      }
-      point.hours += entry.hours;
-      point.byUser[entry.userId] = (point.byUser[entry.userId] ?? 0) + entry.hours;
-    });
-    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
-  })();
+    if ('id' in input) {
+      setEntries(current =>
+        current.map(existing =>
+          existing.id === input.id
+            ? {
+                ...existing,
+                ...input,
+                hours: input.hours ?? existing.hours,
+                updatedAt: new Date().toISOString()
+              }
+            : existing
+        )
+      );
+      return;
+    }
 
-  // Same stable ordering the hub uses: alphabetical over every contributor
-  const contributorSlots = Array.from(contributorNames.entries())
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const contributorColors = buildContributorColors(contributorSlots.map(c => c.value));
-  const dailySeries: DailySeries[] = contributorSlots.map(c => ({
-    userId: c.value,
-    displayName: c.label,
-    color: contributorColors.get(c.value) ?? '#9498a0'
-  }));
+    // The real service only transitions state on a work item's first entry
+    const isFirstOnWorkItem = !entries.some(
+      e => e.workItemId === input.workItemId
+    );
+    if (isFirstOnWorkItem && failSync) setStateWarning(true);
 
-  const activityHours = new Map<string, number>();
-  ACTIVITY_ORDER.forEach(activity => {
-    const total = inProject.filter(e => e.activityType === activity).reduce((s, e) => s + e.hours, 0);
-    if (total > 0) activityHours.set(activity, total);
-  });
+    const now = new Date().toISOString();
+    const created: TimeEntry = {
+      id: nextId(),
+      workItemId: input.workItemId,
+      projectId: PROJECT.id,
+      projectName: PROJECT.name,
+      userId: CURRENT_USER,
+      userDisplayName: 'Priya Raman',
+      date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      hours: input.hours,
+      description: input.description,
+      activityType: input.activityType,
+      createdAt: now,
+      updatedAt: now
+    };
+    setEntries(current => [created, ...current]);
+  };
+
+  const handleDelete = async (target: TimeEntry) => {
+    if (failSync) setSyncWarning(true);
+    setEntries(current => current.filter(e => e.id !== target.id));
+  };
+
+  const reseed = () => {
+    setEntries(SEED_ENTRIES);
+    setSyncWarning(false);
+    setStateWarning(false);
+  };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-[1280px] space-y-3">
-        <div className="rounded-md border border-dashed bg-muted/40 p-3 text-sm">
-          <strong>Local preview</strong> — mock data, no Azure DevOps. Storage,
-          work item metadata and the REST client are not exercised here.
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group by</span>
-          {(['feature', 'workItem', 'contributor', 'activity'] as GroupBy[]).map(option => (
-            <Button
-              key={option}
-              size="sm"
-              variant={groupBy === option ? 'default' : 'outline'}
-              onClick={() => setGroupBy(option)}
-            >
-              {GROUP_BY_LABELS[option]}
-            </Button>
-          ))}
-          <div className="flex-1" />
-          <Button size="sm" variant={includeForeign ? 'default' : 'outline'} onClick={() => setIncludeForeign(v => !v)}>
-            Foreign entry in data: {includeForeign ? 'yes' : 'no'}
-          </Button>
+    <div className="min-h-screen bg-background">
+      {/* Preview-only chrome. Everything below it is the shipped UI. */}
+      <div className="space-y-2 border-b border-dashed bg-muted/40 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="text-sm">Local preview</strong>
           <span className="text-xs text-muted-foreground">
-            excluded by scoping: {otherProject.length}
+            mock data, no Azure DevOps — storage, work item metadata and the REST
+            client are not exercised
           </span>
-          <Button size="sm" variant="outline" onClick={() => setShowTab(v => !v)}>
-            {showTab ? 'Show hub' : 'Show work item list'}
-          </Button>
+          <div className="flex-1" />
+          <Toggle on={surface === 'hub'} onClick={() => setSurface('hub')}>
+            Project hub
+          </Toggle>
+          <Toggle on={surface === 'tab'} onClick={() => setSurface('tab')}>
+            Work item tab
+          </Toggle>
         </div>
 
-        {showTab ? (
-          <Panel title="Work item tab" subtitle="work item #1101">
-            {(() => {
-              const workItemEntries = inProject.filter(e => e.workItemId === 1101);
-              const workItemHours = workItemEntries.reduce((s, e) => s + e.hours, 0);
-              const workItemActivity = new Map<string, number>();
-              workItemEntries.forEach(e => {
-                workItemActivity.set(
-                  e.activityType,
-                  (workItemActivity.get(e.activityType) ?? 0) + e.hours
-                );
-              });
-              return (
-                <div className="flex flex-col md:flex-row gap-0">
-                  <div className="flex-[2] min-w-0 md:pr-6">
-                    <TimeEntryList
-                      entries={workItemEntries}
-                      currentUserId="u1"
-                      onEdit={() => undefined}
-                      onDelete={async () => undefined}
-                    />
-                  </div>
-                  <div className="hidden md:block w-px bg-border" />
-                  <div className="flex-1 min-w-0 mt-6 md:mt-0 md:pl-6 space-y-4">
-                    <ActivityDonutChart
-                      activityHours={workItemActivity}
-                      totalHours={workItemHours}
-                    />
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div>
-                        <div className="text-xs text-muted-foreground">Hours</div>
-                        <div className="text-xl font-bold">{workItemHours.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Entries</div>
-                        <div className="text-xl font-bold">{workItemEntries.length}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </Panel>
-        ) : (
-          <>
-            <ProjectKpis summary={summary} dailyHours={dailyPoints.map(p => p.hours)} />
-
-            <div className="grid items-start gap-3 lg:grid-cols-[1.85fr_1fr]">
-              <div className="min-w-0 space-y-3">
-                <Panel
-                  title={`Time by ${GROUP_BY_LABELS[groupBy].toLowerCase()}`}
-                  subtitle={`${rows.length} rows`}
-                  flush
-                >
-                  <BreakdownTable
-                    rows={rows}
-                    groupBy={groupBy}
-                    totalWorkItems={summary.workItems}
-                    totalClosedWorkItems={closed}
-                  />
-                </Panel>
-                <Panel title="Hours per day" subtitle={`${RANGE.start} to ${RANGE.end}`}>
-                  <DailyHoursChart points={dailyPoints} series={dailySeries} />
-                </Panel>
-              </div>
-              <div className="space-y-3">
-                <Panel title="Hours by activity">
-                  <ActivityDonutChart activityHours={activityHours} totalHours={summary.totalHours} />
-                </Panel>
-                <Panel title="Hours by contributor">
-                  <ContributorBars contributors={contributors} totalHours={summary.totalHours} />
-                </Panel>
-              </div>
-            </div>
-          </>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {surface === 'hub' ? (
+            <>
+              <Toggle on={emptyProject} onClick={() => setEmptyProject(v => !v)}>
+                Empty project
+              </Toggle>
+              <Toggle on={includeForeign} onClick={() => setIncludeForeign(v => !v)}>
+                Other project's entry
+              </Toggle>
+              <Toggle
+                on={includeUnattributed}
+                onClick={() => setIncludeUnattributed(v => !v)}
+              >
+                Unattributable entry
+              </Toggle>
+              <Toggle on={failMetadata} onClick={() => setFailMetadata(v => !v)}>
+                Work item lookup fails
+              </Toggle>
+              <span className="text-xs text-muted-foreground">
+                scoped out: {partition.otherProject.length} · unattributable:{' '}
+                {partition.unattributed.length}
+              </span>
+            </>
+          ) : (
+            <>
+              <Toggle on={failSync} onClick={() => setFailSync(v => !v)}>
+                Field sync fails
+              </Toggle>
+              <span className="text-xs text-muted-foreground">
+                editing as Priya Raman — her entries carry edit and delete
+              </span>
+            </>
+          )}
+          <div className="flex-1" />
+          <Button size="sm" variant="outline" onClick={reseed}>
+            Reset data
+          </Button>
+        </div>
       </div>
+
+      {surface === 'hub' ? (
+        <ProjectTimesheetView
+          projectName={PROJECT.name}
+          projectEntries={failMetadata ? [] : partition.inProject}
+          metadata={failMetadata ? new Map() : metadata}
+          unattributedCount={partition.unattributed.length}
+          metadataError={failMetadata ? METADATA_ERROR : null}
+          endpointFailed={failMetadata}
+          onRefresh={reseed}
+          onRetry={() => setFailMetadata(false)}
+        />
+      ) : (
+        <WorkItemTimesheetView
+          workItemId={TAB_WORK_ITEM}
+          entries={partition.inProject
+            .filter(e => e.workItemId === TAB_WORK_ITEM)
+            .sort((a, b) => b.date.localeCompare(a.date))}
+          currentUserId={CURRENT_USER}
+          syncWarning={syncWarning}
+          stateTransitionWarning={stateWarning}
+          onDismissSyncWarning={() => setSyncWarning(false)}
+          onDismissStateWarning={() => setStateWarning(false)}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   );
 };

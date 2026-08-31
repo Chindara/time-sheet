@@ -54,24 +54,12 @@ export function groupByUser(entries: TimeEntry[]): Map<string, TimeEntry[]> {
   return groupBy(entries, e => e.userId);
 }
 
-export function groupByDate(entries: TimeEntry[]): Map<string, TimeEntry[]> {
-  return groupBy(entries, e => e.date);
-}
-
-export function hoursByWorkItem(entries: TimeEntry[]): Map<number, number> {
-  return sumByGroup(groupByWorkItem(entries));
-}
-
 export function hoursByActivity(entries: TimeEntry[]): Map<string, number> {
   return sumByGroup(groupByActivity(entries));
 }
 
 export function hoursByUser(entries: TimeEntry[]): Map<string, number> {
   return sumByGroup(groupByUser(entries));
-}
-
-export function hoursByDate(entries: TimeEntry[]): Map<string, number> {
-  return sumByGroup(groupByDate(entries));
 }
 
 /**

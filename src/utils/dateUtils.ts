@@ -132,16 +132,6 @@ export function getDateRange(period: 'this-week' | 'last-week' | 'this-month' | 
 }
 
 /**
- * Checks if a date is within a range
- */
-export function isDateInRange(date: string, startDate: string, endDate: string): boolean {
-  const d = new Date(date);
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  return d >= start && d <= end;
-}
-
-/**
  * Formats a 24-hour "HH:MM" time string to 12-hour AM/PM display (e.g., "2:30 PM")
  */
 export function formatTimeForDisplay(time: string): string {
@@ -150,29 +140,4 @@ export function formatTimeForDisplay(time: string): string {
   const period = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour % 12 === 0 ? 12 : hour % 12;
   return `${displayHour}:${minuteStr} ${period}`;
-}
-
-/**
- * Generates all 15-minute interval time options for a full day (96 options)
- * Returns { value: "HH:MM" (24-hour), label: "h:mm AM/PM" (12-hour) }
- */
-export function generateTimeOptions(): { value: string; label: string }[] {
-  const options: { value: string; label: string }[] = [];
-  for (let hour = 0; hour < 24; hour++) {
-    for (const minute of [0, 15, 30, 45]) {
-      const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-      options.push({ value, label: formatTimeForDisplay(value) });
-    }
-  }
-  return options;
-}
-
-/**
- * Gets the number of days between two dates
- */
-export function getDaysBetween(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }

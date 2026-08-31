@@ -33,7 +33,7 @@ export interface ProjectFiltersState {
   endDate: string;
   userIds: string[];
   activityTypes: string[];
-  areaPath: string;
+  iterationPath: string;
 }
 
 interface ProjectFiltersProps {
@@ -41,7 +41,7 @@ interface ProjectFiltersProps {
   onChange: (filters: ProjectFiltersState) => void;
   contributorOptions: MultiSelectOption[];
   activityOptions: MultiSelectOption[];
-  areaPathOptions: string[];
+  iterationOptions: MultiSelectOption[];
   rangeError?: string;
   disabled?: boolean;
 }
@@ -51,7 +51,7 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
   onChange,
   contributorOptions,
   activityOptions,
-  areaPathOptions,
+  iterationOptions,
   rangeError,
   disabled,
 }) => {
@@ -63,7 +63,7 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
   const hasActiveFilters =
     filters.userIds.length > 0 ||
     filters.activityTypes.length > 0 ||
-    filters.areaPath !== "";
+    filters.iterationPath !== "";
 
   return (
     <div className="rounded-md border bg-card p-4">
@@ -156,26 +156,26 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
           />
         </div>
 
-        {/* Area path */}
+        {/* Iteration */}
         <div className="space-y-1.5">
-          <Label htmlFor="area-path" className="text-xs text-muted-foreground">
-            Area path
+          <Label htmlFor="iteration" className="text-xs text-muted-foreground">
+            Iteration
           </Label>
           <Select
-            value={filters.areaPath === "" ? "__all__" : filters.areaPath}
+            value={filters.iterationPath === "" ? "__all__" : filters.iterationPath}
             onValueChange={(value) =>
-              set("areaPath", value === "__all__" ? "" : value)
+              set("iterationPath", value === "__all__" ? "" : value)
             }
-            disabled={disabled}
+            disabled={disabled || iterationOptions.length === 0}
           >
-            <SelectTrigger id="area-path" className="w-[190px]">
+            <SelectTrigger id="iteration" className="w-[190px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="max-h-64">
-              <SelectItem value="__all__">All areas</SelectItem>
-              {areaPathOptions.map((path) => (
-                <SelectItem key={path} value={path}>
-                  {path}
+              <SelectItem value="__all__">All iterations</SelectItem>
+              {iterationOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -196,8 +196,11 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
               ` ${filters.userIds.length} contributor${filters.userIds.length > 1 ? "s" : ""}`}
             {filters.activityTypes.length > 0 &&
               `${filters.userIds.length > 0 ? "," : ""} ${filters.activityTypes.length} activity type${filters.activityTypes.length > 1 ? "s" : ""}`}
-            {filters.areaPath !== "" &&
-              `${filters.userIds.length > 0 || filters.activityTypes.length > 0 ? "," : ""} area ${filters.areaPath}`}
+            {filters.iterationPath !== "" &&
+              `${filters.userIds.length > 0 || filters.activityTypes.length > 0 ? "," : ""} iteration ${
+                iterationOptions.find((o) => o.value === filters.iterationPath)?.label ??
+                filters.iterationPath
+              }`}
           </span>
           <Button
             variant="ghost"
@@ -208,7 +211,7 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
                 ...filters,
                 userIds: [],
                 activityTypes: [],
-                areaPath: "",
+                iterationPath: "",
               })
             }
           >

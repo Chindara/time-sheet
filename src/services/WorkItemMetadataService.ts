@@ -25,7 +25,7 @@ const CORE_FIELDS = [
   'System.Title',
   'System.WorkItemType',
   'System.State',
-  'System.AreaPath',
+  'System.IterationPath',
   'System.TeamProject',
   'Microsoft.VSTS.Scheduling.OriginalEstimate'
 ];
@@ -102,7 +102,8 @@ export interface WorkItemMeta {
   title: string;
   workItemType: string;
   state: string;
-  areaPath: string;
+  /** Iteration (sprint) the work item is assigned to, as a backslash path */
+  iterationPath: string;
   /** Project the work item lives in — the authority for attributing an entry */
   projectName: string;
   parentId?: number;
@@ -475,7 +476,7 @@ export class WorkItemMetadataService {
       title: fields['System.Title'] ?? `Work item ${workItem.id}`,
       workItemType: fields['System.WorkItemType'] ?? '',
       state: fields['System.State'] ?? '',
-      areaPath: fields['System.AreaPath'] ?? '',
+      iterationPath: fields['System.IterationPath'] ?? '',
       projectName: fields['System.TeamProject'] ?? '',
       parentId: parentIdOf(workItem),
       originalEstimate: typeof estimate === 'number' ? estimate : undefined

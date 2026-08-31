@@ -76,7 +76,7 @@ The project time sheet report SHALL present a flat summary table grouped by a us
 - **AND** the summary metrics SHALL remain unchanged
 
 ### Requirement: Project Report Filtering
-The project time sheet report SHALL support filtering by date range, contributor, activity type, and area path.
+The project time sheet report SHALL support filtering by date range, contributor, activity type, and iteration.
 
 #### Scenario: Date range filtering
 - **WHEN** the report loads
@@ -101,6 +101,12 @@ The project time sheet report SHALL support filtering by date range, contributor
 - **WHEN** the user filters by one or more contributors
 - **THEN** only entries logged by those contributors SHALL be included
 - **AND** the summary metrics SHALL reflect the filtered set
+
+#### Scenario: Iteration filtering
+- **WHEN** the user selects an iteration
+- **THEN** only entries whose work item is assigned to that iteration SHALL be included
+- **AND** the iteration list SHALL offer only iterations that entries in this project were logged against
+- **AND** each iteration SHALL be labelled by the path below the project, since the report is already scoped to one project
 
 #### Scenario: Filters are cumulative
 - **WHEN** more than one filter is applied

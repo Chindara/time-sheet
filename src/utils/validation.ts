@@ -172,28 +172,3 @@ export function calculateHoursFromRange(startTime: string, endTime: string): num
   const [endHour, endMin] = endTime.split(':').map(Number);
   return ((endHour * 60 + endMin) - (startHour * 60 + startMin)) / 60;
 }
-
-/**
- * Parses hours from various input formats
- * Supports: decimal (1.5), hours:minutes (1:30)
- */
-export function parseHours(input: string): number | null {
-  // Try decimal format first
-  const decimal = parseFloat(input);
-  if (!isNaN(decimal)) {
-    return decimal;
-  }
-
-  // Try hours:minutes format
-  const timeRegex = /^(\d+):(\d+)$/;
-  const match = input.match(timeRegex);
-  if (match) {
-    const hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    if (minutes >= 0 && minutes < 60) {
-      return hours + (minutes / 60);
-    }
-  }
-
-  return null;
-}

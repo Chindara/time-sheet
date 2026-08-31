@@ -7,7 +7,7 @@ The extension ships two surfaces:
 
 | Surface | Where it appears | What it is for |
 | --- | --- | --- |
-| **Time Sheet tab** | On every work item form | Logging time, and the logger's own timesheet |
+| **Time Sheet tab** | On every work item form | Logging time, and every entry on the work item being viewed |
 | **Time Sheet hub** | Boards → Time Sheet | The project-wide report across every work item and contributor |
 
 ## Getting started
@@ -38,12 +38,15 @@ stored in the extension's own storage inside your organization.
 
 ### The work item tab
 
-- **This work item** — every contributor's entries on the work item being viewed,
-  newest first, with the entry count and total hours in the header.
-- **My Timesheet** — the viewer's own entries across every work item in the
-  current project, grouped by work item, with per-work-item totals and an
-  activity donut chart. Entries can be edited and deleted inline.
-- A view switch moves between the two; **Log Time** is available from both.
+- **Entries on this work item** — every contributor's, as cards carrying the
+  date, the time range, the hours, the activity type and any description, with
+  who logged it and when on the right. The header repeats the entry count and
+  total hours.
+- **Activity donut** beside the list, over the entries on that work item, with a
+  legend giving each activity's hours and share, plus **Hours** and **Entries**
+  tiles.
+- **Log Time** opens the panel from the header; the edit and delete buttons
+  appear only on your own entries.
 
 ### Work item field sync
 
@@ -78,8 +81,11 @@ Boards → **Time Sheet** opens the project-wide report:
 - **Hours by activity** — donut chart over the eight activity types.
 - **Hours by contributor** — labelled bar list with each person's share.
 - **Filters** — date range (All time, This Month, Last Month, This Quarter, or a
-  custom range), contributors, activity types and area path. Everything on the
-  page responds, and active filters are summarised with a **Clear all**.
+  custom range), contributors, activity types and iteration. Each list offers
+  only values the project's own entries use — iterations are labelled by the
+  path below the project, since the report is already scoped to one project.
+  Everything on the page responds, and active filters are summarised with a
+  **Clear all**.
 - **Export CSV** — the filtered entries, with work item title and rolled-up
   feature resolved, preceded by a summary block and per-contributor totals.
 
@@ -111,13 +117,16 @@ time-sheet/
 ├── src/
 │   ├── TimeSheetTab.tsx               # Work item tab entry point
 │   ├── project-timesheet.tsx          # Project hub entry point
-│   ├── preview.tsx                    # Local preview harness (mock data, no SDK)
+│   ├── preview.tsx                    # Local preview harness: renders both views
+│   │                                  # against mock data, no SDK
 │   ├── components/
 │   │   ├── TimeEntryForm/             # Date, start/end time, activity, description
 │   │   ├── TimeEntryPanel/            # Slide-in wrapper around the form
 │   │   ├── TimeEntryList/             # Entries on one work item
-│   │   ├── TimesheetReport/           # "My Timesheet" + ActivityDonutChart
-│   │   ├── ProjectTimesheet/          # The hub: KPIs, filters, breakdown, charts
+│   │   ├── TimesheetReport/           # ActivityDonutChart, shared by both surfaces
+│   │   ├── WorkItemTimesheet/         # The tab's view: header, list, donut, panel
+│   │   ├── ProjectTimesheet/          # The hub: container + view, KPIs, filters,
+│   │   │                              # breakdown, charts
 │   │   └── ui/                        # shadcn/ui primitives
 │   ├── services/
 │   │   ├── DataService.ts             # CRUD over Extension Data Storage, field sync
@@ -162,6 +171,11 @@ npm run serve:dev
 The manifest version in `vss-extension.json` is stamped into the bundle at build
 time and logged at startup, so you can confirm from the browser console which
 build a project is running.
+
+Both surfaces are split into a container that talks to Azure DevOps and a view
+that renders — `WorkItemTimesheetView` and `ProjectTimesheetView`. The preview
+harness renders those same views against mock data, so the local loop shows the
+shipped UI rather than a copy of it.
 
 There is no automated test suite; `npm test` is a placeholder. Verification is
 the preview harness plus the manual passes in

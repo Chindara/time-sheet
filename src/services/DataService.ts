@@ -369,32 +369,6 @@ export class DataService {
   }
 
   /**
-   * Gets current user's time entries for a date range
-   */
-  async getUserTimeEntries(startDate: string, endDate: string): Promise<TimeEntry[]> {
-    if (!this.currentUser) {
-      throw new Error('Data service not initialized');
-    }
-
-    return this.queryTimeEntries({
-      userId: this.currentUser.id,
-      startDate,
-      endDate
-    });
-  }
-
-  /**
-   * Gets all time entries for the current user across all dates
-   */
-  async getAllUserTimeEntries(): Promise<TimeEntry[]> {
-    if (!this.currentUser) {
-      throw new Error('Data service not initialized');
-    }
-
-    return this.queryTimeEntries({ userId: this.currentUser.id });
-  }
-
-  /**
    * Gets every user's time entries for a date range.
    *
    * Documents are written without a scopeType, so they live in the extension's
