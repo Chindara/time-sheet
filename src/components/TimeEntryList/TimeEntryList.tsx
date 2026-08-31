@@ -86,9 +86,9 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({
         return (
           <Card key={entry.id}>
             <CardContent className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex gap-6 mb-3 flex-wrap">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex gap-6 mb-2 flex-wrap">
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">
                         Date
@@ -128,41 +128,53 @@ export const TimeEntryList: React.FC<TimeEntryListProps> = ({
                   </div>
 
                   {entry.description && (
-                    <div className="mb-2 text-sm">{entry.description}</div>
+                    <div className="text-sm whitespace-pre-wrap break-words">
+                      {entry.description}
+                    </div>
                   )}
-
-                  <div className="text-xs text-muted-foreground">
-                    Logged by {entry.userDisplayName} •{" "}
-                    {formatDateTimeForDisplay(entry.createdAt)}
-                    {entry.updatedAt !== entry.createdAt && (
-                      <>
-                        {" "}
-                        • Updated {formatDateTimeForDisplay(entry.updatedAt)}
-                      </>
-                    )}
-                  </div>
                 </div>
 
-                {isOwner && (
-                  <div className="flex gap-2 ml-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(entry)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteClick(entry)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                {/* Authorship sits at the right end so it costs no card height */}
+                <div className="flex items-start gap-2 shrink-0">
+                  <div className="text-right text-xs text-muted-foreground leading-snug">
+                    <div className="whitespace-nowrap">
+                      Logged by {entry.userDisplayName}
+                    </div>
+                    <div className="whitespace-nowrap">
+                      {formatDateTimeForDisplay(entry.createdAt)}
+                    </div>
+                    {entry.updatedAt !== entry.createdAt && (
+                      <div className="whitespace-nowrap">
+                        Updated {formatDateTimeForDisplay(entry.updatedAt)}
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {isOwner && (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Edit"
+                        aria-label="Edit time entry"
+                        onClick={() => onEdit(entry)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title="Delete"
+                        aria-label="Delete time entry"
+                        onClick={() => handleDeleteClick(entry)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

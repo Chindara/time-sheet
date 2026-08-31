@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 import * as SDK from "azure-devops-extension-sdk";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { cn } from "@/lib/utils";
-import { Loader2, Plus, Calendar, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   TimeEntry,
   CreateTimeEntryInput,
@@ -13,10 +12,10 @@ import {
 import { dataService } from "./services/DataService";
 import { workItemService } from "./services/WorkItemService";
 import { workItemMetadataService } from "./services/WorkItemMetadataService";
-import { totalHours as sumHours } from "./utils/aggregate";
+import { hoursByActivity, totalHours as sumHours } from "./utils/aggregate";
 import { TimeEntryList } from "./components/TimeEntryList/TimeEntryList";
 import { TimeEntryPanel } from "./components/TimeEntryPanel/TimeEntryPanel";
-import { TimesheetReport } from "./components/TimesheetReport/TimesheetReport";
+import { ActivityDonutChart } from "./components/TimesheetReport/ActivityDonutChart";
 import "./styles.css";
 
 const TimeSheetTab: React.FC = () => {
@@ -28,13 +27,10 @@ const TimeSheetTab: React.FC = () => {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
-  // Opens on the work item being viewed; My Timesheet is one click away
-  const [showReport, setShowReport] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(
     undefined,
   );
   const [totalHours, setTotalHours] = useState(0);
-  const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   useEffect(() => {
     initialize();
@@ -132,10 +128,9 @@ const TimeSheetTab: React.FC = () => {
         await loadTimeEntries(workItemId);
       }
 
-      // Close panel and refresh report
+      // Close panel
       setShowForm(false);
       setEditingEntry(undefined);
-      setReportRefreshKey((k) => k + 1);
     } catch (err) {
       throw err; // Let the form handle the error
     }
@@ -157,11 +152,10 @@ const TimeSheetTab: React.FC = () => {
         setStateTransitionWarning(true);
       }
 
-      // Reload entries and refresh report
+      // Reload entries
       if (workItemId) {
         await loadTimeEntries(workItemId);
       }
-      setReportRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("Failed to delete entry:", err);
       setError("Failed to delete time entry");
@@ -199,46 +193,10 @@ const TimeSheetTab: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold">Time Sheet</h2>
             <p className="text-sm text-muted-foreground">
-              {showReport
-                ? `Total hours on work item #${workItemId}: ${totalHours.toFixed(2)}`
-                : `${entries.length} ${entries.length === 1 ? "entry" : "entries"} on work item #${workItemId} · ${totalHours.toFixed(2)} hours`}
+              {`${entries.length} ${entries.length === 1 ? "entry" : "entries"} on work item #${workItemId} · ${totalHours.toFixed(2)} hours`}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Scope switch: My Timesheet spans every work item, so this is the
-                only way back to the entries on the work item being viewed */}
-            <div
-              className="flex overflow-hidden rounded-md border"
-              role="group"
-              aria-label="View"
-            >
-              <button
-                type="button"
-                aria-pressed={showReport}
-                onClick={() => setShowReport(true)}
-                className={cn(
-                  "border-r px-3 py-2 text-sm",
-                  showReport
-                    ? "bg-primary/10 font-semibold text-primary"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                My Timesheet
-              </button>
-              <button
-                type="button"
-                aria-pressed={!showReport}
-                onClick={() => setShowReport(false)}
-                className={cn(
-                  "px-3 py-2 text-sm",
-                  !showReport
-                    ? "bg-primary/10 font-semibold text-primary"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                This work item
-              </button>
-            </div>
             <Button onClick={handleLogTimeClick} disabled={showForm}>
               Log Time
             </Button>
@@ -291,21 +249,41 @@ const TimeSheetTab: React.FC = () => {
 
       {/* Content */}
       <div className="p-6">
-        {showReport ? (
-          <TimesheetReport
-            onClose={() => setShowReport(false)}
-            onEdit={handleEditEntry}
-            onDelete={handleDeleteEntry}
-            refreshKey={reportRefreshKey}
-          />
-        ) : (
-          <TimeEntryList
-            entries={entries}
-            currentUserId={currentUserId}
-            onEdit={handleEditEntry}
-            onDelete={handleDeleteEntry}
-          />
-        )}
+        {/* Entries on the left, activity breakdown on the right */}
+        <div className="flex flex-col md:flex-row gap-0">
+          {/* Left column (2/3): entries logged on this work item */}
+          <div className="flex-[2] min-w-0 md:pr-6">
+            <TimeEntryList
+              entries={entries}
+              currentUserId={currentUserId}
+              onEdit={handleEditEntry}
+              onDelete={handleDeleteEntry}
+            />
+          </div>
+
+          {/* Vertical separator */}
+          <div className="hidden md:block w-px bg-border" />
+
+          {/* Right column (1/3): summary */}
+          <div className="flex-1 min-w-0 mt-6 md:mt-0 md:pl-6 space-y-4">
+            <ActivityDonutChart
+              activityHours={hoursByActivity(entries)}
+              totalHours={totalHours}
+            />
+
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div>
+                <div className="text-xs text-muted-foreground">Hours</div>
+                <div className="text-xl font-bold">{totalHours.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Entries</div>
+                <div className="text-xl font-bold">{entries.length}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <TimeEntryPanel
           isOpen={showForm}
           workItemId={workItemId!}

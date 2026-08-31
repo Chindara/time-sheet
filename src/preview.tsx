@@ -210,13 +210,47 @@ const PreviewApp: React.FC = () => {
         </div>
 
         {showTab ? (
-          <Panel title="Work item tab — This work item" subtitle="work item #1101">
-            <TimeEntryList
-              entries={inProject.filter(e => e.workItemId === 1101)}
-              currentUserId="u1"
-              onEdit={() => undefined}
-              onDelete={async () => undefined}
-            />
+          <Panel title="Work item tab" subtitle="work item #1101">
+            {(() => {
+              const workItemEntries = inProject.filter(e => e.workItemId === 1101);
+              const workItemHours = workItemEntries.reduce((s, e) => s + e.hours, 0);
+              const workItemActivity = new Map<string, number>();
+              workItemEntries.forEach(e => {
+                workItemActivity.set(
+                  e.activityType,
+                  (workItemActivity.get(e.activityType) ?? 0) + e.hours
+                );
+              });
+              return (
+                <div className="flex flex-col md:flex-row gap-0">
+                  <div className="flex-[2] min-w-0 md:pr-6">
+                    <TimeEntryList
+                      entries={workItemEntries}
+                      currentUserId="u1"
+                      onEdit={() => undefined}
+                      onDelete={async () => undefined}
+                    />
+                  </div>
+                  <div className="hidden md:block w-px bg-border" />
+                  <div className="flex-1 min-w-0 mt-6 md:mt-0 md:pl-6 space-y-4">
+                    <ActivityDonutChart
+                      activityHours={workItemActivity}
+                      totalHours={workItemHours}
+                    />
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Hours</div>
+                        <div className="text-xl font-bold">{workItemHours.toFixed(2)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Entries</div>
+                        <div className="text-xl font-bold">{workItemEntries.length}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </Panel>
         ) : (
           <>

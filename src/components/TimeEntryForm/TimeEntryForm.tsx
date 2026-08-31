@@ -29,6 +29,9 @@ interface TimeEntryFormProps {
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i));
 const MINUTE_OPTIONS = ["00", "15", "30", "45"];
 
+/** Mirrors the cap enforced by validateCreateTimeEntry/validateUpdateTimeEntry */
+const DESCRIPTION_MAX_LENGTH = 500;
+
 /** Formats decimal hours as a human-readable duration string */
 function formatDuration(hours: number): string {
   const totalMinutes = Math.round(hours * 60);
@@ -271,13 +274,18 @@ export const TimeEntryForm: React.FC<TimeEntryFormProps> = ({
             id="description"
             placeholder="What did you work on?"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            // maxLength stops typing at the cap; the slice also covers a paste
+            // that some browsers let through
+            onChange={(e) =>
+              setDescription(e.target.value.slice(0, DESCRIPTION_MAX_LENGTH))
+            }
+            maxLength={DESCRIPTION_MAX_LENGTH}
             disabled={isSaving}
             rows={3}
             className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
           <p className="text-xs text-muted-foreground">
-            {description.length}/500 characters
+            {description.length}/{DESCRIPTION_MAX_LENGTH} characters
           </p>
         </div>
 
