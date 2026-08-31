@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/select";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { Button } from "@/components/ui/button";
-import { GroupBy, GROUP_BY_LABELS } from "../../utils/breakdown";
 import { cn } from "@/lib/utils";
 
 export type RangePreset =
@@ -28,13 +27,6 @@ export const RANGE_PRESET_LABELS: Record<RangePreset, string> = {
   custom: "Custom Range",
 };
 
-const GROUP_BY_OPTIONS: GroupBy[] = [
-  "feature",
-  "workItem",
-  "contributor",
-  "activity",
-];
-
 export interface ProjectFiltersState {
   preset: RangePreset;
   startDate: string;
@@ -42,7 +34,6 @@ export interface ProjectFiltersState {
   userIds: string[];
   activityTypes: string[];
   areaPath: string;
-  groupBy: GroupBy;
 }
 
 interface ProjectFiltersProps {
@@ -191,35 +182,6 @@ export const ProjectFilters: React.FC<ProjectFiltersProps> = ({
           </Select>
         </div>
 
-        <div className="flex-1" />
-
-        {/* Group by */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Group by</Label>
-          <div
-            className="flex overflow-hidden rounded-md border"
-            role="group"
-            aria-label="Group by"
-          >
-            {GROUP_BY_OPTIONS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={filters.groupBy === option}
-                disabled={disabled}
-                onClick={() => set("groupBy", option)}
-                className={cn(
-                  "border-r px-3 py-2 text-sm last:border-r-0 disabled:opacity-50",
-                  filters.groupBy === option
-                    ? "bg-primary/10 font-semibold text-primary"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {GROUP_BY_LABELS[option]}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {rangeError && (

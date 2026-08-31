@@ -10,13 +10,15 @@ import {
 } from "../../services/WorkItemMetadataService";
 import { exportService } from "../../services/ExportService";
 import { formatDateToISO, getDateRange } from "../../utils/dateUtils";
-import { hoursByDate, hoursByUser } from "../../utils/aggregate";
+import { hoursByUser } from "../../utils/aggregate";
 import {
   buildBreakdown,
   buildSummary,
+  GroupBy,
   GROUP_BY_LABELS,
 } from "../../utils/breakdown";
 import { ACTIVITY_ORDER } from "../../utils/activityColors";
+import { buildContributorColors, contributorColor } from "../../utils/contributorColors";
 import { partitionByProject } from "../../utils/projectScope";
 import {
   ProjectFilters,
@@ -26,10 +28,18 @@ import {
 import { ProjectKpis } from "./ProjectKpis";
 import { BreakdownTable } from "./BreakdownTable";
 import { ContributorBars, ContributorTotal } from "./ContributorBars";
-import { DailyHoursChart, DailyPoint } from "./DailyHoursChart";
+import { DailyHoursChart, DailyPoint, DailySeries } from "./DailyHoursChart";
 import { ActivityDonutChart } from "../TimesheetReport/ActivityDonutChart";
 
 const CLOSED_STATES = ["Closed", "Done", "Completed", "Resolved", "Removed"];
+
+/**
+ * The breakdown table groups by feature. It used to be switchable, but the
+ * other groupings are all answered elsewhere on the page — contributor by the
+ * contributor bars and the stacked daily chart, activity by the donut — so the
+ * control was three ways of re-reading panels already on screen.
+ */
+const BREAKDOWN_GROUP_BY: GroupBy = "feature";
 
 /**
  * Upper bound on the whole startup path before we give up and say so. Generous,
@@ -65,7 +75,6 @@ function defaultFilters(): ProjectFiltersState {
     userIds: [],
     activityTypes: [],
     areaPath: "",
-    groupBy: "feature",
   };
 }
 
@@ -312,8 +321,8 @@ export const ProjectTimesheet: React.FC = () => {
   );
 
   const rows = useMemo(
-    () => buildBreakdown(filteredEntries, metadata, filters.groupBy),
-    [filteredEntries, metadata, filters.groupBy],
+    () => buildBreakdown(filteredEntries, metadata, BREAKDOWN_GROUP_BY),
+    [filteredEntries, metadata],
   );
 
   const closedWorkItems = useMemo(() => {
@@ -338,13 +347,25 @@ export const ProjectTimesheet: React.FC = () => {
       .sort((a, b) => b.hours - a.hours);
   }, [filteredEntries]);
 
-  const dailyPoints = useMemo<DailyPoint[]>(
-    () =>
-      Array.from(hoursByDate(filteredEntries).entries())
-        .map(([date, hours]) => ({ date, hours }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [filteredEntries],
-  );
+  /** One point per day, carrying both the day's total and its per-contributor split */
+  const dailyPoints = useMemo<DailyPoint[]>(() => {
+    const byDate = new Map<string, DailyPoint>();
+
+    filteredEntries.forEach((entry) => {
+      let point = byDate.get(entry.date);
+      if (!point) {
+        point = { date: entry.date, hours: 0, byUser: {} };
+        byDate.set(entry.date, point);
+      }
+      point.hours += entry.hours;
+      point.byUser[entry.userId] =
+        (point.byUser[entry.userId] ?? 0) + entry.hours;
+    });
+
+    return Array.from(byDate.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+  }, [filteredEntries]);
 
   const activityHours = useMemo(() => {
     const hours = new Map<string, number>();
@@ -375,6 +396,32 @@ export const ProjectTimesheet: React.FC = () => {
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [projectEntries]);
+
+  /**
+   * Colours are pinned to a contributor's slot in the project-wide list, not to
+   * their position in the filtered set, so narrowing the contributor filter
+   * never repaints the people who remain.
+   */
+  const contributorColors = useMemo(
+    () => buildContributorColors(contributorOptions.map((o) => o.value)),
+    [contributorOptions],
+  );
+
+  /**
+   * Stack segments for the daily chart, in the same stable order as the colour
+   * slots — so a day's segments keep their vertical order between renders —
+   * limited to contributors who actually logged time in the current view.
+   */
+  const dailySeries = useMemo<DailySeries[]>(() => {
+    const present = new Set(filteredEntries.map((e) => e.userId));
+    return contributorOptions
+      .filter((option) => present.has(option.value))
+      .map((option) => ({
+        userId: option.value,
+        displayName: option.label,
+        color: contributorColors.get(option.value) ?? contributorColor(0),
+      }));
+  }, [filteredEntries, contributorOptions, contributorColors]);
 
   const activityOptions = useMemo(() => {
     const present = new Set(projectEntries.map((e) => e.activityType as string));
@@ -596,7 +643,7 @@ export const ProjectTimesheet: React.FC = () => {
             <div className="grid items-start gap-3 lg:grid-cols-[1.85fr_1fr]">
               <div className="min-w-0 space-y-3">
                 <Panel
-                  title={`Time by ${GROUP_BY_LABELS[filters.groupBy].toLowerCase()}`}
+                  title={`Time by ${GROUP_BY_LABELS[BREAKDOWN_GROUP_BY].toLowerCase()}`}
                   subtitle={
                     isResolvingMetadata
                       ? "resolving work item titles..."
@@ -606,7 +653,7 @@ export const ProjectTimesheet: React.FC = () => {
                 >
                   <BreakdownTable
                     rows={rows}
-                    groupBy={filters.groupBy}
+                    groupBy={BREAKDOWN_GROUP_BY}
                     totalWorkItems={summary.workItems}
                     totalClosedWorkItems={closedWorkItems}
                     metadataFailed={metadataError !== null}
@@ -614,7 +661,7 @@ export const ProjectTimesheet: React.FC = () => {
                 </Panel>
 
                 <Panel title="Hours per day" subtitle={rangeSubtitle}>
-                  <DailyHoursChart points={dailyPoints} />
+                  <DailyHoursChart points={dailyPoints} series={dailySeries} />
                 </Panel>
               </div>
 

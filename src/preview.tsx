@@ -18,11 +18,12 @@ import { TimeEntryList } from './components/TimeEntryList/TimeEntryList';
 import { BreakdownTable } from './components/ProjectTimesheet/BreakdownTable';
 import { ProjectKpis } from './components/ProjectTimesheet/ProjectKpis';
 import { ContributorBars } from './components/ProjectTimesheet/ContributorBars';
-import { DailyHoursChart } from './components/ProjectTimesheet/DailyHoursChart';
+import { DailyHoursChart, DailyPoint, DailySeries } from './components/ProjectTimesheet/DailyHoursChart';
 import { ActivityDonutChart } from './components/TimesheetReport/ActivityDonutChart';
 import { buildBreakdown, buildSummary, GroupBy, GROUP_BY_LABELS } from './utils/breakdown';
-import { hoursByDate, hoursByUser } from './utils/aggregate';
+import { hoursByUser } from './utils/aggregate';
 import { ACTIVITY_ORDER } from './utils/activityColors';
+import { buildContributorColors } from './utils/contributorColors';
 import { partitionByProject } from './utils/projectScope';
 import { Button } from '@/components/ui/button';
 import './styles.css';
@@ -145,9 +146,30 @@ const PreviewApp: React.FC = () => {
     .map(([userId, hours]) => ({ userId, displayName: contributorNames.get(userId) ?? userId, hours }))
     .sort((a, b) => b.hours - a.hours);
 
-  const dailyPoints = Array.from(hoursByDate(inProject).entries())
-    .map(([date, hours]) => ({ date, hours }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const dailyPoints: DailyPoint[] = (() => {
+    const byDate = new Map<string, DailyPoint>();
+    inProject.forEach(entry => {
+      let point = byDate.get(entry.date);
+      if (!point) {
+        point = { date: entry.date, hours: 0, byUser: {} };
+        byDate.set(entry.date, point);
+      }
+      point.hours += entry.hours;
+      point.byUser[entry.userId] = (point.byUser[entry.userId] ?? 0) + entry.hours;
+    });
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  })();
+
+  // Same stable ordering the hub uses: alphabetical over every contributor
+  const contributorSlots = Array.from(contributorNames.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const contributorColors = buildContributorColors(contributorSlots.map(c => c.value));
+  const dailySeries: DailySeries[] = contributorSlots.map(c => ({
+    userId: c.value,
+    displayName: c.label,
+    color: contributorColors.get(c.value) ?? '#9498a0'
+  }));
 
   const activityHours = new Map<string, number>();
   ACTIVITY_ORDER.forEach(activity => {
@@ -215,7 +237,7 @@ const PreviewApp: React.FC = () => {
                   />
                 </Panel>
                 <Panel title="Hours per day" subtitle={`${RANGE.start} to ${RANGE.end}`}>
-                  <DailyHoursChart points={dailyPoints} />
+                  <DailyHoursChart points={dailyPoints} series={dailySeries} />
                 </Panel>
               </div>
               <div className="space-y-3">
