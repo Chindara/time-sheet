@@ -1,10 +1,11 @@
 {
   "manifestVersion": 1,
   "id": "devops-timesheet-extension",
-  "version": "1.2.1",
+  "version": "1.2.3",
   "name": "Time Sheet",
   "description": "Track time spent on work items with comprehensive reporting and export capabilities. Log hours, generate timesheet reports, and export data to CSV/Excel.",
   "publisher": "iamcpb",
+  "public": true,
   "categories": ["Azure Boards"],
   "tags": [
     "time tracking",

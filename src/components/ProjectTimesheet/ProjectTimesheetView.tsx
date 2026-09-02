@@ -526,6 +526,7 @@ export const ProjectTimesheetView: React.FC<ProjectTimesheetViewProps> = ({
                   <ContributorBars
                     contributors={contributors}
                     totalHours={summary.totalHours}
+                    colors={contributorColors}
                   />
                 </Panel>
               </div>

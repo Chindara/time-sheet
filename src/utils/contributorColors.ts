@@ -1,3 +1,5 @@
+import { PALETTE_SPECTRUM } from './palette';
+
 /**
  * Categorical colours for contributors.
  *
@@ -7,24 +9,12 @@
  * the same way every render, and a person keeps their colour while filters
  * change the subset actually drawn.
  *
- * The palette is categorical rather than sequential: adjacent slots differ in
- * hue and lightness so neighbouring segments of a stacked bar stay separable,
- * including under the common colour vision deficiencies. Colour is never the
- * only carrier of identity here — the chart ships a labelled legend and every
- * segment names its contributor and hours on hover.
+ * The hues come from the shared PALETTE, the same source the activity charts
+ * draw from, so the whole report reads as one colour system. Colour is never
+ * the only carrier of identity here — the chart ships a labelled legend and
+ * every segment names its contributor and hours on hover.
  */
-export const CONTRIBUTOR_COLORS: string[] = [
-  '#4269d0',
-  '#efb118',
-  '#ff725c',
-  '#6cc5b0',
-  '#3ca951',
-  '#ff8ab7',
-  '#a463f2',
-  '#97bbf5',
-  '#9c6b4e',
-  '#9498a0'
-];
+export const CONTRIBUTOR_COLORS: string[] = PALETTE_SPECTRUM;
 
 /** Used once the palette is exhausted and slots start repeating */
 export function contributorColor(slot: number): string {
@@ -38,6 +28,8 @@ export function contributorColor(slot: number): string {
  */
 export function buildContributorColors(userIds: string[]): Map<string, string> {
   const colors = new Map<string, string>();
-  userIds.forEach((userId, index) => colors.set(userId, contributorColor(index)));
+  userIds.forEach((userId, index) =>
+    colors.set(userId, contributorColor(index)),
+  );
   return colors;
 }

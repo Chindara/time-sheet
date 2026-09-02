@@ -9,6 +9,11 @@ export interface ContributorTotal {
 interface ContributorBarsProps {
   contributors: ContributorTotal[];
   totalHours: number;
+  /**
+   * Bar colour per user id, shared with the daily chart so one person reads as
+   * the same colour in both. Missing ids fall back to the theme accent.
+   */
+  colors?: Map<string, string>;
 }
 
 /**
@@ -19,6 +24,7 @@ interface ContributorBarsProps {
 export const ContributorBars: React.FC<ContributorBarsProps> = ({
   contributors,
   totalHours,
+  colors,
 }) => {
   if (contributors.length === 0) {
     return (
@@ -50,9 +56,12 @@ export const ContributorBars: React.FC<ContributorBarsProps> = ({
           </div>
           <div className="mt-1 h-2 overflow-hidden rounded-sm bg-muted">
             <div
-              className="h-full rounded-sm bg-primary"
+              className={`h-full rounded-sm${
+                colors?.get(contributor.userId) ? "" : " bg-primary"
+              }`}
               style={{
                 width: peak === 0 ? "0%" : `${(contributor.hours / peak) * 100}%`,
+                backgroundColor: colors?.get(contributor.userId),
               }}
             />
           </div>

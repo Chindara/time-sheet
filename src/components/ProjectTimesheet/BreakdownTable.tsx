@@ -2,6 +2,7 @@ import React from "react";
 import { AlertCircle, Lock } from "lucide-react";
 import { BreakdownRow, GroupBy, GROUP_BY_COLUMN } from "../../utils/breakdown";
 import { activityColor } from "../../utils/activityColors";
+import { ACCENT_COLOR } from "../../utils/palette";
 
 interface BreakdownTableProps {
   rows: BreakdownRow[];
@@ -101,7 +102,8 @@ export const BreakdownTable: React.FC<BreakdownTableProps> = ({
                     )
                   ) : (
                     <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm bg-primary"
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                      style={{ backgroundColor: ACCENT_COLOR }}
                       aria-hidden="true"
                     />
                   )}

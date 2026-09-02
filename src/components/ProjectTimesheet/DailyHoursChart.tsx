@@ -95,6 +95,59 @@ const ChartTooltip: React.FC<{
   );
 };
 
+/** Matches the corner rounding on the contributor bars and the KPI sparkline */
+const BAR_RADIUS = 4;
+
+interface StackSegmentProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  /** The chart row this segment was drawn from */
+  payload?: { topIndex?: number };
+  /** Which stack position this segment is, matched against the row's topIndex */
+  seriesIndex: number;
+}
+
+/**
+ * One segment of a day's stack.
+ *
+ * Recharts' own `radius` prop rounds every segment, which on a stack reads as a
+ * column of separate floating bars. The cap belongs to the bar rather than to
+ * any one contributor, so it is drawn only on whichever segment is topmost that
+ * day and the segments below stay square.
+ */
+const StackSegment: React.FC<StackSegmentProps> = ({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  fill,
+  payload,
+  seriesIndex,
+}) => {
+  // Contributors who logged nothing that day still get a segment, of zero height
+  if (height <= 0 || width <= 0) return null;
+
+  if (payload?.topIndex !== seriesIndex) {
+    return <rect x={x} y={y} width={width} height={height} fill={fill} />;
+  }
+
+  // Clamped so a very short top segment curves rather than overshooting
+  const r = Math.min(BAR_RADIUS, width / 2, height);
+  return (
+    <path
+      d={
+        `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} ` +
+        `L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} ` +
+        `L${x + width},${y + height} Z`
+      }
+      fill={fill}
+    />
+  );
+};
+
 /**
  * Hours per day across the selected range, stacked by contributor. The stack
  * keeps the daily total readable as the bar height while showing who made it
@@ -118,9 +171,14 @@ export const DailyHoursChart: React.FC<DailyHoursChartProps> = ({
       // Compact tick: day of month only, the panel subtitle carries the range
       tick: point.date.slice(8, 10),
     };
+    // The last non-zero segment is the one that carries the bar's rounded cap
+    let topIndex = -1;
     series.forEach((s, index) => {
-      row[seriesKey(index)] = point.byUser[s.userId] ?? 0;
+      const hours = point.byUser[s.userId] ?? 0;
+      row[seriesKey(index)] = hours;
+      if (hours > 0) topIndex = index;
     });
+    row.topIndex = topIndex;
     return row;
   });
 
@@ -155,10 +213,13 @@ export const DailyHoursChart: React.FC<DailyHoursChartProps> = ({
               stackId="hours"
               fill={s.color}
               maxBarSize={28}
-              // A rounded cap only reads right on an unstacked bar: on a stack
-              // it would land on whichever contributor happens to be top that
-              // day, so the caps come off as soon as there is more than one
-              radius={series.length === 1 ? [4, 4, 0, 0] : undefined}
+              // A custom shape is only handed the opening frame of the grow-in
+              // animation, so with it enabled every segment would draw at zero
+              // height. The animation is no loss on a dense daily chart.
+              isAnimationActive={false}
+              shape={(props: object) => (
+                <StackSegment {...props} seriesIndex={index} />
+              )}
             />
           ))}
         </BarChart>

@@ -1,5 +1,6 @@
 import React from "react";
 import { ProjectSummary } from "../../utils/breakdown";
+import { ACCENT_COLOR } from "../../utils/palette";
 import { cn } from "@/lib/utils";
 
 interface ProjectKpisProps {
@@ -59,10 +60,13 @@ export const ProjectKpis: React.FC<ProjectKpisProps> = ({
               <span
                 key={index}
                 className={cn(
-                  "flex-1 rounded-t-sm bg-primary",
+                  "flex-1 rounded-t-sm",
                   index === dailyHours.length - 1 ? "opacity-100" : "opacity-40",
                 )}
-                style={{ height: `${Math.max((hours / peak) * 100, 2)}%` }}
+                style={{
+                  height: `${Math.max((hours / peak) * 100, 2)}%`,
+                  backgroundColor: ACCENT_COLOR,
+                }}
               />
             ))}
           </div>
