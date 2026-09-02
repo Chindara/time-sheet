@@ -1,111 +1,212 @@
-# Time Sheet for Azure DevOps
+# Azure DevOps Time Sheet Extension
 
-Track time spent on work items with built-in reporting and work item synchronization. This extension adds a dedicated "Time Sheet" tab to all work items, allowing teams to log hours, view timesheet summaries, and keep Azure DevOps fields in sync automatically.
+Track time against work items inside Azure DevOps Boards, keep the built-in
+scheduling fields in sync, and read the whole project's time back in one report.
+
+The extension ships two surfaces:
+
+| Surface | Where it appears | What it is for |
+| --- | --- | --- |
+| **Time Sheet tab** | On every work item form | Logging time, and every entry on the work item being viewed |
+| **Time Sheet hub** | Boards → Time Sheet | The project-wide report across every work item and contributor |
+
+## Getting started
+
+1. Install **Time Sheet** from the Azure DevOps Marketplace into your organization.
+2. Open any work item and select the **Time Sheet** tab.
+3. Click **Log Time**, pick the date and the start and end times, choose an
+   activity type, and save. The work item's `Completed Work` and `Remaining Work`
+   update on their own.
+4. For the project-wide picture, go to **Boards → Time Sheet**.
+
+Nothing else needs configuring — there are no settings, and time entries are
+stored in the extension's own storage inside your organization.
 
 ## Features
 
-### 📝 Time Entry Logging
-- **Quick Time Logging**: Add time entries directly from work item forms via a slide-in panel
-- **Flexible Input**: Enter hours in decimal format (e.g., `1.5`) or time format (e.g., `1:30`)
-- **Rich Context**: Add descriptions and categorize work with 8 activity types:
-  - Development
-  - Code Review
-  - Testing
-  - Bug Fixing
-  - Documentation
-  - Design
-  - Requirements
-  - Deployment
-- **Edit & Delete**: Manage your own time entries with full edit and delete capabilities (with delete confirmation)
+### Logging time
 
-### 📊 Timesheet Report
-- **My Entries View**: See all your time entries across all work items in one place
-- **Work Item Grouping**: Time entries organized by work item for easy tracking, with per-work-item hour totals
-- **Activity Breakdown**: Donut chart visualizing time distribution by activity type
-- **Summary Statistics**: Total hours logged and total entry count
-- **Inline Edit & Delete**: Edit or remove entries directly from the report
+- **Slide-in panel** on the work item's Time Sheet tab — the work item stays on screen behind it.
+- **Start and end time**, picked as hour + quarter-hour, with the duration derived from
+  the range and shown back as you pick (`2 h 15 min`). Entries store both the range
+  and the decimal hours.
+- **Eight activity types**: Development, Code Review, Testing, Bug Fixing,
+  Documentation, Design, Requirements, Deployment.
+- **Optional description**, up to 500 characters.
+- **Edit and delete your own entries only** — ownership is enforced in the data
+  layer, not just hidden in the UI. Deletes are confirmed.
 
-### 🔄 Automatic Work Item Synchronization
-- **Completed Work**: Automatically updates the `Completed Work` field to reflect the sum of all logged hours
-- **Remaining Work**: Automatically recalculates `Remaining Work` as `Original Estimate − Completed Work` (floored at 0)
-- **State Transitions** (Task and Bug work items only):
-  - When the **first** time entry is logged, the work item state is automatically set to **"In Development"**
-  - When the **last** time entry is deleted (no entries remain), the work item state is automatically reset to **"New"**
-- All synchronization is non-blocking: if a field or state update fails, the time entry operation still succeeds and a dismissible warning is shown
+### The work item tab
 
-### 🔒 Security & Permissions
-- **Work Item Permissions**: Respects Azure DevOps work item security
-- **User Isolation**: Users can only edit or delete their own time entries
-- **Secure Storage**: Data stored using Azure DevOps Extension Data Service with retry logic
+- **Entries on this work item** — every contributor's, as cards carrying the
+  date, the time range, the hours, the activity type and any description, with
+  who logged it and when on the right. The header repeats the entry count and
+  total hours.
+- **Activity donut** beside the list, over the entries on that work item, with a
+  legend giving each activity's hours and share, plus **Hours** and **Entries**
+  tiles.
+- **Log Time** opens the panel from the header; the edit and delete buttons
+  appear only on your own entries.
 
-## Getting Started
+### Work item field sync
 
-### Installation
-1. Install the extension from the Azure DevOps Marketplace
-2. Navigate to any work item in your Azure DevOps organization
-3. Click the **"Time Sheet"** tab to start logging time
+After any entry is created, edited or deleted, the work item is updated:
 
-### Logging Time
-1. Open any work item (User Story, Task, Bug, etc.)
-2. Click the **"Time Sheet"** tab
-3. Click **"Log Time"**
-4. Fill in:
-   - Date (defaults to today)
-   - Hours (e.g., `1.5` or `1:30`)
-   - Activity Type
-   - Description (optional, up to 500 characters)
-5. Click **"Save"**
+- `Completed Work` ← the sum of all logged hours on that work item, across all users.
+- `Remaining Work` ← `max(0, Original Estimate − Completed Work)`.
+- `Original Estimate` is read only — the extension never writes it.
+- **State transitions** for `Task`, `Bug` and `Suggestion` work items: the first
+  entry moves the item to **In Development**; deleting the last entry moves it
+  back to **New**.
 
-The work item's Completed Work and Remaining Work fields update automatically. For Task and Bug work items, the state transitions to "In Development" on the first entry.
+Sync is non-blocking. If a field write or state change fails — permissions, a
+network error, a process template without those states — the time entry is still
+saved and a dismissible warning explains what did not happen.
 
-### Viewing Your Timesheet
-The Time Sheet tab displays all your time entries across work items grouped by work item, alongside a donut chart and summary totals. Use the edit (pencil) and delete (trash) icons next to each entry to manage them inline.
+### The project hub
 
-### Warnings
-If the automatic work item field sync or state transition cannot complete (e.g., due to insufficient permissions or a network error), a dismissible warning banner is shown at the top of the tab. The time entry itself is always saved successfully.
+Boards → **Time Sheet** opens the project-wide report:
 
-## Use Cases
+- **KPI tiles** — total hours, contributors (with the average each), hours per
+  working day with a sparkline, and logged-vs-estimate as a percentage of the
+  summed Original Estimate with the over/under difference.
+- **Time by feature** — every leaf work item is walked up its parent chain to the
+  Feature (or Epic) it rolls up to, so a Task under a User Story under a Feature
+  is counted against that Feature. Rows carry hours, share of total, contributor
+  and work item counts, closed-item progress, and an activity mix strip. Work
+  items with no such ancestor collect in **No parent feature**; unreadable ones
+  collect in **Restricted**, which discloses nothing but its hours.
+- **Hours per day** — a daily bar chart, stacked by contributor, with a legend
+  and a per-day breakdown on hover.
+- **Hours by activity** — donut chart over the eight activity types.
+- **Hours by contributor** — labelled bar list with each person's share.
+- **Filters** — date range (All time, This Month, Last Month, This Quarter, or a
+  custom range), contributors, activity types and iteration. Each list offers
+  only values the project's own entries use — iterations are labelled by the
+  path below the project, since the report is already scoped to one project.
+  Everything on the page responds, and active filters are summarised with a
+  **Clear all**.
+- **Export CSV** — the filtered entries, with work item title and rolled-up
+  feature resolved, preceded by a summary block and per-contributor totals.
 
-### Sprint & Project Tracking
-- Track actual time spent vs. estimates using automatic Completed/Remaining Work sync
-- Identify which activity types consume the most time
+### Project scoping
 
-### Productivity Analysis
-- Analyze time distribution across activity types via the built-in donut chart
-- Review time logged across multiple work items from a single view
+Extension storage is account-wide and has no project dimension, so which project
+an entry belongs to is reconstructed rather than queried:
 
-### Compliance & Auditing
-- Maintain accurate, per-user time records stored securely within Azure DevOps
-- All entries include timestamps (created/updated) for audit trails
+1. The work item's `System.TeamProject` — the authority, and correct even for
+   entries written before project stamping existed, or for work items that were
+   moved between projects.
+2. The `projectId` / `projectName` stamped on the entry when it was created —
+   used only when the work item cannot be read, so a restricted work item in this
+   project still counts toward its totals.
 
-## Privacy & Data
+Entries matching neither are excluded from the report and the count is disclosed
+on screen, rather than being folded into the current project's totals.
 
-- **Data Storage**: All time entries are stored securely using Azure DevOps Extension Data Service
-- **Data Ownership**: Your organization owns all time entry data
-- **No External Services**: No data is sent to external services or third parties
-- **User Privacy**: Time entries are only visible to users with work item access
+Work item metadata is fetched in batches, and the request shape degrades
+gracefully across API versions: `System.Parent` in a field list first, the parent
+hierarchy relation next, and finally core fields with no parent at all — in which
+case titles, states and scoping still work and feature grouping falls back to
+"No parent feature".
 
-## Support
+## Project structure
 
-- **Repository**: [github.com/Chindara/time-sheet](https://github.com/Chindara/time-sheet)
-- **Issues & Feature Requests**: [GitHub Issues](https://github.com/Chindara/time-sheet/issues)
+```
+time-sheet/
+├── src/
+│   ├── TimeSheetTab.tsx               # Work item tab entry point
+│   ├── project-timesheet.tsx          # Project hub entry point
+│   ├── preview.tsx                    # Local preview harness: renders both views
+│   │                                  # against mock data, no SDK
+│   ├── components/
+│   │   ├── TimeEntryForm/             # Date, start/end time, activity, description
+│   │   ├── TimeEntryPanel/            # Slide-in wrapper around the form
+│   │   ├── TimeEntryList/             # Entries on one work item
+│   │   ├── TimesheetReport/           # ActivityDonutChart, shared by both surfaces
+│   │   ├── WorkItemTimesheet/         # The tab's view: header, list, donut, panel
+│   │   ├── ProjectTimesheet/          # The hub: container + view, KPIs, filters,
+│   │   │                              # breakdown, charts
+│   │   └── ui/                        # shadcn/ui primitives
+│   ├── services/
+│   │   ├── DataService.ts             # CRUD over Extension Data Storage, field sync
+│   │   ├── WorkItemService.ts         # Work item form service access
+│   │   ├── WorkItemMetadataService.ts # Batched REST lookup + rollup resolution
+│   │   └── ExportService.ts           # CSV generation
+│   ├── models/TimeEntry.ts
+│   └── utils/                         # aggregate, breakdown, rollup, projectScope,
+│                                      # dateUtils, validation, colour palettes
+├── docs/                              # User, testing, deployment, local testing guides
+├── openspec/                          # Specs and change proposals
+├── vss-extension.json                 # Extension manifest (contributions, scopes, version)
+├── webpack.config.js                  # Two bundles: timesheet-tab, project-timesheet
+└── package.json
+```
 
-## Version History
+## Development
 
-### 1.0.1
-- Automatic state transitions for Task and Bug work items (first entry → "In Development", last entry deleted → "New")
+```bash
+# Install
+npm install --legacy-peer-deps
 
-### 1.0.0 (Initial Release)
-- Time entry logging on work items
-- Timesheet report grouped by work item with activity donut chart
-- Automatic Completed Work and Remaining Work field sync
-- Edit and delete with ownership enforcement
-- 8 activity type categories
+# UI preview with mock data — no Azure DevOps required (http://localhost:3000)
+npm run preview
+
+# Watch build
+npm run dev
+
+# Production build
+npm run build
+
+# Build and package into a .vsix
+npm run package
+
+# Package with the dev overrides (private publisher/id)
+npm run package:dev
+
+# Serve dist/ over HTTPS for a locally-hosted extension
+npm run serve:dev
+```
+
+The manifest version in `vss-extension.json` is stamped into the bundle at build
+time and logged at startup, so you can confirm from the browser console which
+build a project is running.
+
+Both surfaces are split into a container that talks to Azure DevOps and a view
+that renders — `WorkItemTimesheetView` and `ProjectTimesheetView`. The preview
+harness renders those same views against mock data, so the local loop shows the
+shipped UI rather than a copy of it.
+
+There is no automated test suite; `npm test` is a placeholder. Verification is
+the preview harness plus the manual passes in
+[docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md).
+
+### Documentation
+
+- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) — using the extension
+- [docs/LOCAL_TESTING.md](docs/LOCAL_TESTING.md) — the two local loops and what each can prove
+- [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) — manual test passes against a real organization
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — packaging and marketplace publishing
+- [overview.md](overview.md) — the marketplace listing content
+- [openspec/](openspec/) — capability specs and change proposals
+
+## Technologies
+
+- **Frontend:** React 19, TypeScript 5
+- **UI:** Tailwind CSS with shadcn/ui primitives, lucide-react icons
+- **Charts:** Recharts
+- **Build:** Webpack 5, ts-loader, PostCSS
+- **Platform:** Azure DevOps Extension SDK 4.x, Extension Data Service for storage,
+  Work Item Tracking REST client for metadata
+- **Packaging:** tfx-cli
+
+## Permissions
+
+The extension requests a single scope, `vso.work_write`, which it needs to read
+work item metadata and to write `Completed Work`, `Remaining Work` and state
+transitions back to work items. Time entries themselves are stored in the
+extension's own data storage — no data leaves the Azure DevOps organization.
 
 ## License
 
-MIT License - See LICENSE.txt for details
-
----
-
-**Built for Azure DevOps teams who need simple, effective time tracking**
+MIT — see [LICENSE.txt](LICENSE.txt).
