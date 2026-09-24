@@ -13,6 +13,7 @@ import { dataService } from "./services/DataService";
 import { workItemService } from "./services/WorkItemService";
 import { workItemMetadataService } from "./services/WorkItemMetadataService";
 import { WorkItemTimesheetView } from "./components/WorkItemTimesheet/WorkItemTimesheetView";
+import { watchHostTheme } from "./utils/hostTheme";
 import "./styles.css";
 
 const TimeSheetTab: React.FC = () => {
@@ -178,6 +179,7 @@ SDK.init().then(async () => {
     );
     // Wait for SDK to be fully ready
     await SDK.ready();
+    watchHostTheme();
 
     const container = document.getElementById("root");
     if (container) {

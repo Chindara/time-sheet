@@ -47,7 +47,16 @@ export const ActivityDonutChart: React.FC<ActivityDonutChartProps> = ({
               <Cell key={entry.name} fill={activityColor(entry.name)} />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number) => [`${value.toFixed(2)}h`]} />
+          <Tooltip
+            formatter={(value: number) => [`${value.toFixed(2)}h`]}
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              borderColor: "hsl(var(--border))",
+              borderRadius: "6px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+          />
         </PieChart>
       </ResponsiveContainer>
 

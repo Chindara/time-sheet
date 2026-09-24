@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import * as SDK from "azure-devops-extension-sdk";
 import { ProjectTimesheet } from "./components/ProjectTimesheet/ProjectTimesheet";
+import { watchHostTheme } from "./utils/hostTheme";
 import "./styles.css";
 
 // Entry point for the project-level Time Sheet hub contributed to the Boards
@@ -13,6 +14,7 @@ SDK.init().then(async () => {
       `Time Sheet hub v${typeof __EXTENSION_VERSION__ === "string" ? __EXTENSION_VERSION__ : "unknown"} starting`,
     );
     await SDK.ready();
+    watchHostTheme();
 
     const container = document.getElementById("root");
     if (container) {
