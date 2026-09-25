@@ -5,12 +5,14 @@ import {
   IProjectPageService
 } from 'azure-devops-extension-api';
 import { getClient } from 'azure-devops-extension-api/Common';
+import { TeamContext } from 'azure-devops-extension-api/Core';
 import {
   WorkItem,
   WorkItemErrorPolicy,
   WorkItemExpand
 } from 'azure-devops-extension-api/WorkItemTracking';
 import { WorkItemTrackingRestClient } from 'azure-devops-extension-api/WorkItemTracking/WorkItemTrackingClient';
+import { WorkRestClient } from 'azure-devops-extension-api/Work/WorkClient';
 import { parentIdOf, resolveRollups } from '../utils/rollup';
 
 /**
@@ -124,8 +126,11 @@ export interface WorkItemMeta {
  */
 export class WorkItemMetadataService {
   private client: WorkItemTrackingRestClient | null = null;
+  private workClient: WorkRestClient | null = null;
   private projectName = '';
   private projectId = '';
+  private teamName = '';
+  private teamId = '';
   private cache = new Map<number, WorkItemMeta>();
   /** Ids the API declined to return — cached so we do not re-request them */
   private inaccessible = new Set<number>();
@@ -166,6 +171,18 @@ export class WorkItemMetadataService {
     this.projectName = project.name;
     this.projectId = project.id;
 
+    // Best-effort: a hub opened outside a team-scoped context simply gets no
+    // team, which disables current-iteration resolution rather than failing
+    try {
+      const team = SDK.getTeamContext();
+      if (team?.id) {
+        this.teamId = team.id;
+        this.teamName = team.name;
+      }
+    } catch (error) {
+      console.warn('Team context unavailable:', error);
+    }
+
     /*
      * rootPath is supplied explicitly, and that is the whole point.
      *
@@ -177,7 +194,10 @@ export class WorkItemMetadataService {
      * the request path free of host handshakes.
      */
     this.client = getClient(WorkItemTrackingRestClient, {
-      rootPath: this.resolveRootPath()
+      rootPath: this.resolveRootPath(WorkItemTrackingRestClient.RESOURCE_AREA_ID)
+    });
+    this.workClient = getClient(WorkRestClient, {
+      rootPath: this.resolveRootPath(WorkRestClient.RESOURCE_AREA_ID)
     });
   }
 
@@ -189,7 +209,7 @@ export class WorkItemMetadataService {
    * is not in the context (on-premises collections), and it is given a timeout
    * so it cannot stall the client it is meant to configure.
    */
-  private async resolveRootPath(): Promise<string> {
+  private async resolveRootPath(resourceAreaId: string): Promise<string> {
     try {
       const host = SDK.getHost();
       if (host?.name) {
@@ -206,7 +226,7 @@ export class WorkItemMetadataService {
       'LocationService'
     );
     const url = await withTimeout(
-      locationService.getResourceAreaLocation(WorkItemTrackingRestClient.RESOURCE_AREA_ID),
+      locationService.getResourceAreaLocation(resourceAreaId),
       SERVICE_TIMEOUT_MS,
       'getResourceAreaLocation'
     );
@@ -262,6 +282,35 @@ export class WorkItemMetadataService {
 
   getProjectId(): string {
     return this.projectId;
+  }
+
+  /**
+   * Resolves the current team's active iteration, for defaulting the
+   * Iteration filter — a nice-to-have, not something the report depends on,
+   * so every failure mode here (no team, no active sprint, request failure)
+   * resolves to `null` rather than throwing.
+   */
+  async getCurrentIterationPath(): Promise<string | null> {
+    if (!this.workClient || !this.teamId) return null;
+
+    const teamContext: TeamContext = {
+      project: this.projectName,
+      projectId: this.projectId,
+      team: this.teamName,
+      teamId: this.teamId
+    };
+
+    try {
+      const iterations = await withTimeout(
+        this.workClient.getTeamIterations(teamContext, 'current'),
+        SERVICE_TIMEOUT_MS,
+        'getTeamIterations'
+      );
+      return iterations[0]?.path ?? null;
+    } catch (error) {
+      console.warn('Current iteration lookup failed:', error);
+      return null;
+    }
   }
 
   /**

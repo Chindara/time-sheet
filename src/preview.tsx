@@ -22,9 +22,11 @@ import {
 } from './models/TimeEntry';
 import { WorkItemMeta } from './services/WorkItemMetadataService';
 import { ProjectTimesheetView } from './components/ProjectTimesheet/ProjectTimesheetView';
+import { ReportDefinition, ReportRunResult } from './components/ProjectTimesheet/ReportsPanel';
 import { WorkItemTimesheetView } from './components/WorkItemTimesheet/WorkItemTimesheetView';
-import { partitionByProject } from './utils/projectScope';
-import { formatDateToISO } from './utils/dateUtils';
+import { aggregateByProjectAndUser, attributeProjects, partitionByProject } from './utils/projectScope';
+import { formatDateToISO, getMonthRange } from './utils/dateUtils';
+import { exportService } from './services/ExportService';
 import { Button } from '@/components/ui/button';
 import './styles.css';
 
@@ -161,6 +163,11 @@ const PreviewApp: React.FC = () => {
   const [failSync, setFailSync] = useState(false);
   const [syncWarning, setSyncWarning] = useState(false);
   const [stateWarning, setStateWarning] = useState(false);
+  const [currentSprintActive, setCurrentSprintActive] = useState(true);
+
+  // Stands in for what WorkItemMetadataService.getCurrentIterationPath()
+  // would resolve — Sprint 13 has logged entries, so it's a usable default
+  const currentIterationPath = currentSprintActive ? 'Web Platform\\Sprint 13' : null;
 
   const dataset = emptyProject
     ? []
@@ -233,6 +240,32 @@ const PreviewApp: React.FC = () => {
     setStateWarning(false);
   };
 
+  /**
+   * Runs against the same `dataset`/`metadata` the hub itself uses — including
+   * the foreign-project and unattributable toggle entries — so the panel can be
+   * exercised end to end (cross-project rows, the excluded-entry disclosure,
+   * the empty-month state) without a real work item lookup.
+   */
+  const runMonthlySummary = async (year: number, month: number): Promise<ReportRunResult> => {
+    const { startDate, endDate } = getMonthRange(year, month);
+    const start = formatDateToISO(startDate);
+    const end = formatDateToISO(endDate);
+
+    const monthEntries = dataset.filter(e => e.date >= start && e.date <= end);
+    if (monthEntries.length === 0) return { status: 'empty' };
+
+    const { attributed, unattributedCount } = attributeProjects(monthEntries, metadata);
+    if (attributed.length === 0) return { status: 'empty' };
+
+    const rows = aggregateByProjectAndUser(attributed);
+    exportService.exportMonthlySummary(rows, `monthly-summary_${start.slice(0, 7)}.csv`);
+    return { status: 'exported', excludedCount: unattributedCount };
+  };
+
+  const reports: ReportDefinition[] = [
+    { id: 'monthly-summary', label: 'Monthly Summary', run: runMonthlySummary }
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Preview-only chrome. Everything below it is the shipped UI. */}
@@ -270,6 +303,9 @@ const PreviewApp: React.FC = () => {
               <Toggle on={failMetadata} onClick={() => setFailMetadata(v => !v)}>
                 Work item lookup fails
               </Toggle>
+              <Toggle on={currentSprintActive} onClick={() => setCurrentSprintActive(v => !v)}>
+                Current sprint active
+              </Toggle>
               <span className="text-xs text-muted-foreground">
                 scoped out: {partition.otherProject.length} · unattributable:{' '}
                 {partition.unattributed.length}
@@ -300,6 +336,8 @@ const PreviewApp: React.FC = () => {
           unattributedCount={partition.unattributed.length}
           metadataError={failMetadata ? METADATA_ERROR : null}
           endpointFailed={failMetadata}
+          reports={reports}
+          currentIterationPath={currentIterationPath}
           onRefresh={reseed}
           onRetry={() => setFailMetadata(false)}
         />

@@ -51,6 +51,18 @@ export function getEndOfMonth(date: Date = new Date()): Date {
 }
 
 /**
+ * Gets the start and end of a specific month, given as a calendar year and a
+ * 1-indexed month (matching the value of an `<input type="month">`).
+ */
+export function getMonthRange(year: number, month: number): { startDate: Date; endDate: Date } {
+  const reference = new Date(year, month - 1, 1);
+  return {
+    startDate: getStartOfMonth(reference),
+    endDate: getEndOfMonth(reference)
+  };
+}
+
+/**
  * Formats a date for display (e.g., "Jan 15, 2024")
  */
 export function formatDateForDisplay(dateString: string): string {

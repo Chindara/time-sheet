@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CalendarRange, RefreshCw } from "lucide-react";
@@ -25,6 +25,7 @@ import { BreakdownTable } from "./BreakdownTable";
 import { ContributorBars, ContributorTotal } from "./ContributorBars";
 import { DailyHoursChart, DailyPoint, DailySeries } from "./DailyHoursChart";
 import { ActivityDonutChart } from "../TimesheetReport/ActivityDonutChart";
+import { ReportsPanel, ReportDefinition } from "./ReportsPanel";
 
 const CLOSED_STATES = ["Closed", "Done", "Completed", "Resolved", "Removed"];
 
@@ -81,8 +82,27 @@ export interface ProjectTimesheetViewProps {
   endpointFailed?: boolean;
   /** A load error worth showing while some data is still on screen */
   error?: string;
+  /** Cross-project reports offered from the Reports panel */
+  reports?: ReportDefinition[];
+  /** The current sprint's iteration path, for defaulting the Iteration filter */
+  currentIterationPath?: string | null;
   onRefresh: () => void;
   onRetry: () => void;
+}
+
+/**
+ * Whether an iteration option is the same iteration the Work API reported as
+ * current. Not always a plain equality check: `System.IterationPath` (what
+ * options are built from) always includes the project name as its root
+ * segment, but it isn't certain from documentation alone whether the Work
+ * API's `path` does too — so a path ending the other on a `\` boundary counts
+ * as the same iteration as well.
+ */
+function isCurrentIteration(optionPath: string, currentPath: string): boolean {
+  if (optionPath === currentPath) return true;
+  return (
+    optionPath.endsWith(`\\${currentPath}`) || currentPath.endsWith(`\\${optionPath}`)
+  );
 }
 
 /**
@@ -101,6 +121,8 @@ export const ProjectTimesheetView: React.FC<ProjectTimesheetViewProps> = ({
   metadataError = null,
   endpointFailed = false,
   error = "",
+  reports = [],
+  currentIterationPath = null,
   onRefresh,
   onRetry,
 }) => {
@@ -314,6 +336,25 @@ export const ProjectTimesheetView: React.FC<ProjectTimesheetViewProps> = ({
       });
   }, [projectEntries, metadata]);
 
+  /**
+   * Pre-selects the current sprint, once, the first time it resolves to an
+   * option that actually exists — never before that (nothing to select yet)
+   * and never again after (so clearing the filter back to "All iterations"
+   * sticks, rather than being fought on the next render).
+   */
+  const appliedDefaultIterationRef = useRef(false);
+  useEffect(() => {
+    if (appliedDefaultIterationRef.current || !currentIterationPath) return;
+
+    const match = iterationOptions.find((option) =>
+      isCurrentIteration(option.value, currentIterationPath),
+    );
+    if (!match) return;
+
+    appliedDefaultIterationRef.current = true;
+    setFilters((f) => (f.iterationPath === "" ? { ...f, iterationPath: match.value } : f));
+  }, [currentIterationPath, iterationOptions]);
+
   /** Switching to a custom range seeds the inputs from the range in view */
   const handleFiltersChange = (next: ProjectFiltersState) => {
     if (next.preset === "custom" && filters.preset !== "custom") {
@@ -376,6 +417,7 @@ export const ProjectTimesheetView: React.FC<ProjectTimesheetViewProps> = ({
             <Button onClick={handleExport} disabled={filteredEntries.length === 0}>
               Export CSV
             </Button>
+            {reports.length > 0 && <ReportsPanel reports={reports} />}
           </div>
         </div>
       </div>

@@ -68,3 +68,75 @@ export function partitionByProject(
 
   return { inProject, otherProject, unattributed };
 }
+
+export interface ProjectAttribution {
+  entry: TimeEntry;
+  /** Resolved project label — a name when known, otherwise the stamped id */
+  projectName: string;
+}
+
+export interface ProjectAttributionResult {
+  attributed: ProjectAttribution[];
+  /** Count of entries that could not be tied to any project, for disclosure */
+  unattributedCount: number;
+}
+
+/**
+ * Resolves every entry's project using the same priority order as
+ * partitionByProject (work item's System.TeamProject first, then the stamped
+ * projectId/projectName), but keeps each entry's own project instead of
+ * filtering against a single target — for reports that span every project.
+ */
+export function attributeProjects(
+  entries: TimeEntry[],
+  metadata: Map<number, WorkItemMeta>
+): ProjectAttributionResult {
+  const attributed: ProjectAttribution[] = [];
+  let unattributedCount = 0;
+
+  for (const entry of entries) {
+    const meta = metadata.get(entry.workItemId);
+
+    if (meta && meta.projectName) {
+      attributed.push({ entry, projectName: meta.projectName });
+      continue;
+    }
+
+    if (entry.projectName || entry.projectId) {
+      attributed.push({ entry, projectName: entry.projectName || entry.projectId! });
+      continue;
+    }
+
+    unattributedCount++;
+  }
+
+  return { attributed, unattributedCount };
+}
+
+export interface MonthlySummaryRow {
+  project: string;
+  user: string;
+  totalHours: number;
+}
+
+/**
+ * Sums hours per project/user pair, sorted by project then user so the
+ * exported report reads the same way every time.
+ */
+export function aggregateByProjectAndUser(attributed: ProjectAttribution[]): MonthlySummaryRow[] {
+  const totals = new Map<string, MonthlySummaryRow>();
+
+  for (const { entry, projectName } of attributed) {
+    const key = `${projectName}\u0000${entry.userDisplayName}`;
+    const existing = totals.get(key);
+    if (existing) {
+      existing.totalHours += entry.hours;
+    } else {
+      totals.set(key, { project: projectName, user: entry.userDisplayName, totalHours: entry.hours });
+    }
+  }
+
+  return Array.from(totals.values()).sort(
+    (a, b) => a.project.localeCompare(b.project) || a.user.localeCompare(b.user)
+  );
+}

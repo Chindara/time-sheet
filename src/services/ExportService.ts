@@ -1,5 +1,6 @@
 import { TimeEntry } from '../models/TimeEntry';
 import { WorkItemMeta } from './WorkItemMetadataService';
+import { MonthlySummaryRow } from '../utils/projectScope';
 
 /** Column order for every time entry export */
 const HEADERS = [
@@ -110,6 +111,24 @@ export class ExportService {
    */
   exportToExcel(entries: TimeEntry[], filename: string, summary?: ExportSummary): void {
     this.exportTimeEntries(entries, filename.replace('.xlsx', '.csv'), { summary });
+  }
+
+  /**
+   * Exports a project x user hours summary — one row per pair, rather than
+   * the fixed 12-column per-entry shape the other export methods write.
+   */
+  exportMonthlySummary(rows: MonthlySummaryRow[], filename: string): void {
+    const csvContent =
+      'Project,User,Total Hours\n' +
+      rows
+        .map(row =>
+          [row.project, row.user, row.totalHours.toFixed(2)]
+            .map(cell => this.escapeCSVCell(cell))
+            .join(',')
+        )
+        .join('\n');
+
+    this.downloadFile(csvContent, filename, 'text/csv');
   }
 
   /**

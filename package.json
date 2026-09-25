@@ -1,6 +1,6 @@
 {
   "name": "devops-time-sheet",
-  "version": "1.2.4",
+  "version": "1.2.6",
   "description": "Azure DevOps extension for tracking time on work items",
   "main": "dist/timesheet-tab.js",
   "scripts": {

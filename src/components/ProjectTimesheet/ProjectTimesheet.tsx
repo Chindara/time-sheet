@@ -4,11 +4,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { TimeEntry } from "../../models/TimeEntry";
 import { dataService } from "../../services/DataService";
+import { exportService } from "../../services/ExportService";
 import {
   WorkItemMeta,
   workItemMetadataService,
 } from "../../services/WorkItemMetadataService";
-import { partitionByProject } from "../../utils/projectScope";
+import {
+  aggregateByProjectAndUser,
+  attributeProjects,
+  partitionByProject,
+} from "../../utils/projectScope";
+import { formatDateToISO, getMonthRange } from "../../utils/dateUtils";
+import { ReportDefinition, ReportRunResult } from "./ReportsPanel";
 import { ProjectTimesheetView } from "./ProjectTimesheetView";
 
 /**
@@ -33,6 +40,9 @@ export const ProjectTimesheet: React.FC = () => {
   const [hasResolvedMetadata, setHasResolvedMetadata] = useState(false);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [endpointFailed, setEndpointFailed] = useState(false);
+  /** Current sprint's iteration path, for defaulting the Iteration filter — a
+   *  nice-to-have that must never block or fail the load it rides alongside */
+  const [currentIterationPath, setCurrentIterationPath] = useState<string | null>(null);
   /** Last startup step reached, so a timeout can name where it stalled */
   const stageRef = useRef("starting up");
   const [stage, setStage] = useState("starting up");
@@ -87,6 +97,13 @@ export const ProjectTimesheet: React.FC = () => {
       console.log("Project resolved:", context.name, context.id);
       setProject(context);
       dataService.setProjectContext(context);
+
+      // Fire-and-forget: a default is nice to have, not load-bearing, so it
+      // must never hold up or fail the report it rides alongside
+      workItemMetadataService
+        .getCurrentIterationPath()
+        .then(setCurrentIterationPath)
+        .catch(() => setCurrentIterationPath(null));
 
       enterStage("loading time entries");
       await loadEntries();
@@ -189,6 +206,45 @@ export const ProjectTimesheet: React.FC = () => {
   /** Entries belonging to this project — the basis for everything below */
   const projectEntries = partition.inProject;
 
+  /**
+   * Monthly Summary: total hours per project and user for a chosen month,
+   * across every project the current user can access — not just this one.
+   * Runs against `allEntries` rather than `projectEntries`, and resolves
+   * metadata for whatever work items that month touches, since a work item
+   * from another project has usually never been looked up here before.
+   */
+  const runMonthlySummary = async (year: number, month: number): Promise<ReportRunResult> => {
+    const { startDate, endDate } = getMonthRange(year, month);
+    const start = formatDateToISO(startDate);
+    const end = formatDateToISO(endDate);
+
+    const monthEntries = allEntries.filter(
+      (entry) => entry.date >= start && entry.date <= end,
+    );
+    if (monthEntries.length === 0) {
+      return { status: "empty" };
+    }
+
+    const ids = Array.from(new Set(monthEntries.map((e) => e.workItemId))).sort(
+      (a, b) => a - b,
+    );
+    const monthMetadata = await workItemMetadataService.getMetadata(ids);
+
+    const { attributed, unattributedCount } = attributeProjects(monthEntries, monthMetadata);
+    if (attributed.length === 0) {
+      return { status: "empty" };
+    }
+
+    const rows = aggregateByProjectAndUser(attributed);
+    exportService.exportMonthlySummary(rows, `monthly-summary_${start.slice(0, 7)}.csv`);
+
+    return { status: "exported", excludedCount: unattributedCount };
+  };
+
+  const reports: ReportDefinition[] = [
+    { id: "monthly-summary", label: "Monthly Summary", run: runMonthlySummary },
+  ];
+
   // Hold the report back until attribution is settled — showing totals from a
   // half-resolved partition would flash other projects' hours on screen
   if (isLoading || !hasResolvedMetadata) {
@@ -226,6 +282,8 @@ export const ProjectTimesheet: React.FC = () => {
       metadataError={metadataError}
       endpointFailed={endpointFailed}
       error={error}
+      reports={reports}
+      currentIterationPath={currentIterationPath}
       onRefresh={loadEntries}
       onRetry={initialize}
     />
